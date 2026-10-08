@@ -2,6 +2,8 @@ package fr.reveil.musical.infrastructure.track;
 
 import com.sun.net.httpserver.HttpServer;
 import fr.reveil.musical.application.port.TrackProviderException;
+import fr.reveil.musical.application.port.SourceTrackProvider;
+import fr.reveil.musical.domain.MusicSource;
 import fr.reveil.musical.domain.Track;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,8 +17,10 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,16 +114,51 @@ class TrackProvidersTest {
     void resilientProviderUsesTheHardcodedFallbackWhenRemoteProvidersFail() {
         FallbackTrackProvider fallback = new FallbackTrackProvider();
         ResilientTrackProvider provider = new ResilientTrackProvider(
-                title -> {
-                    throw new TrackProviderException("iTunes", "Unavailable");
-                },
-                title -> {
-                    throw new TrackProviderException("MusicBrainz", "Unavailable");
-                },
+                List.of(
+                        sourceProvider(MusicSource.ITUNES, title -> {
+                            throw new TrackProviderException("iTunes", "Unavailable");
+                        }),
+                        sourceProvider(MusicSource.MUSICBRAINZ, title -> {
+                            throw new TrackProviderException("MusicBrainz", "Unavailable");
+                        })),
                 fallback);
 
         assertEquals(Optional.of(new Track("Aube tranquille", "Réveil Musical")),
-                provider.findTrack("Aube tranquille"));
+                provider.findTrack("Aube tranquille", MusicSource.MUSICBRAINZ));
+    }
+
+    @Test
+    void searchesThePreferredMusicSourceBeforeOtherSources() {
+        AtomicReference<MusicSource> firstSource = new AtomicReference<>();
+        SourceTrackProvider itunes = sourceProvider(MusicSource.ITUNES, title -> {
+            firstSource.compareAndSet(null, MusicSource.ITUNES);
+            return Optional.of(new Track("iTunes result", "Artist"));
+        });
+        SourceTrackProvider musicBrainz = sourceProvider(MusicSource.MUSICBRAINZ, title -> {
+            firstSource.compareAndSet(null, MusicSource.MUSICBRAINZ);
+            return Optional.of(new Track("MusicBrainz result", "Artist"));
+        });
+        ResilientTrackProvider provider = new ResilientTrackProvider(
+                List.of(itunes, musicBrainz),
+                new FallbackTrackProvider());
+
+        assertEquals(Optional.of(new Track("MusicBrainz result", "Artist")),
+                provider.findTrack("Song title", MusicSource.MUSICBRAINZ));
+        assertEquals(MusicSource.MUSICBRAINZ, firstSource.get());
+    }
+
+    @Test
+    void triesOtherSourcesBeforeUsingTheLocalFallback() {
+        SourceTrackProvider itunes = sourceProvider(MusicSource.ITUNES, title -> Optional.empty());
+        SourceTrackProvider musicBrainz = sourceProvider(
+                MusicSource.MUSICBRAINZ,
+                title -> Optional.of(new Track("Found by MusicBrainz", "Artist")));
+        ResilientTrackProvider provider = new ResilientTrackProvider(
+                List.of(itunes, musicBrainz),
+                new FallbackTrackProvider());
+
+        assertEquals(Optional.of(new Track("Found by MusicBrainz", "Artist")),
+                provider.findTrack("Song title", MusicSource.ITUNES));
     }
 
     @Test
@@ -149,5 +188,21 @@ class TrackProvidersTest {
         });
         server.start();
         serverStarted = true;
+    }
+
+    private SourceTrackProvider sourceProvider(
+            MusicSource source,
+            Function<String, Optional<Track>> search) {
+        return new SourceTrackProvider() {
+            @Override
+            public MusicSource source() {
+                return source;
+            }
+
+            @Override
+            public Optional<Track> findTrack(String title) {
+                return search.apply(title);
+            }
+        };
     }
 }

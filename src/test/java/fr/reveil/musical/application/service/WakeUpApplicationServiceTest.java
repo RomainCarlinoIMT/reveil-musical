@@ -1,10 +1,11 @@
 package fr.reveil.musical.application.service;
 
 import fr.reveil.musical.application.port.NotificationAdapter;
-import fr.reveil.musical.application.port.TrackProvider;
+import fr.reveil.musical.application.port.PreferredTrackProvider;
 import fr.reveil.musical.application.port.UserMusicPreferencesProvider;
 import fr.reveil.musical.application.port.UserPreferencesProvider;
 import fr.reveil.musical.domain.MusicCondition;
+import fr.reveil.musical.domain.MusicSource;
 import fr.reveil.musical.domain.NotificationChannel;
 import fr.reveil.musical.domain.Track;
 import fr.reveil.musical.domain.UserId;
@@ -34,14 +35,17 @@ class WakeUpApplicationServiceTest {
         List<String> titles = List.of("Song one", "Song two");
         UserMusicPreferences musicPreferences = musicPreferences(
                 Map.of(new MusicCondition(DayOfWeek.MONDAY, WeatherType.SOLEIL), titles),
-                "Fallback song");
+                "Fallback song",
+                MusicSource.MUSICBRAINZ);
         UserWakeUpPreferences wakeUpPreferences = wakeUpPreferences(NotificationChannel.SMS);
         AtomicReference<String> searchedTitle = new AtomicReference<>();
         AtomicReference<Track> sentTrack = new AtomicReference<>();
         AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
 
-        TrackProvider trackProvider = title -> {
+        AtomicReference<MusicSource> searchedSource = new AtomicReference<>();
+        PreferredTrackProvider trackProvider = (title, source) -> {
             searchedTitle.set(title);
+            searchedSource.set(source);
             return Optional.of(new Track(title, "Artist"));
         };
         NotificationAdapter emailAdapter = notificationAdapter(NotificationChannel.EMAIL, sentChannel, sentTrack);
@@ -59,6 +63,7 @@ class WakeUpApplicationServiceTest {
         assertTrue(titles.contains(searchedTitle.get()));
         assertEquals(NotificationChannel.SMS, sentChannel.get());
         assertEquals(searchedTitle.get(), sentTrack.get().title());
+        assertEquals(MusicSource.MUSICBRAINZ, searchedSource.get());
     }
 
     @Test
@@ -68,7 +73,7 @@ class WakeUpApplicationServiceTest {
         AtomicReference<String> searchedTitle = new AtomicReference<>();
         AtomicReference<Track> sentTrack = new AtomicReference<>();
         AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
-        TrackProvider trackProvider = title -> {
+        PreferredTrackProvider trackProvider = (title, source) -> {
             searchedTitle.set(title);
             return Optional.of(new Track(title, "Artist"));
         };
@@ -106,7 +111,7 @@ class WakeUpApplicationServiceTest {
                 sentTitle.set(track.title());
             }
         };
-        TrackProvider trackProvider = title -> title.equals("Fallback song")
+        PreferredTrackProvider trackProvider = (title, source) -> title.equals("Fallback song")
                 ? Optional.of(new Track(title, "Artist"))
                 : Optional.empty();
         WakeUpApplicationService service = new WakeUpApplicationService(
@@ -127,7 +132,14 @@ class WakeUpApplicationServiceTest {
     private UserMusicPreferences musicPreferences(
             Map<MusicCondition, List<String>> tracksByCondition,
             String fallback) {
-        return new UserMusicPreferences(tracksByCondition, fallback);
+        return musicPreferences(tracksByCondition, fallback, MusicSource.ITUNES);
+    }
+
+    private UserMusicPreferences musicPreferences(
+            Map<MusicCondition, List<String>> tracksByCondition,
+            String fallback,
+            MusicSource preferredSource) {
+        return new UserMusicPreferences(tracksByCondition, fallback, preferredSource);
     }
 
     private UserPreferencesProvider preferenceProvider(UserWakeUpPreferences preferences) {

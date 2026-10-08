@@ -5,15 +5,17 @@ Java et Spring Boot pour préparer l'injection de dépendances (IoC), avec une
 séparation entre le domaine et les ports d'accès aux fournisseurs.
 
 Les sources musicales iTunes et MusicBrainz sont intégrées derrière
-`TrackProvider`. Un fournisseur composite tente iTunes, puis MusicBrainz, avant
-de choisir un morceau local en secours. L'ordonnancement du réveil reste à
+`TrackProvider`. Le fournisseur composite tente d'abord la source préférée par
+l'utilisateur, puis les autres sources distantes configurées, avant de choisir
+un morceau local en secours. L'ordonnancement du réveil reste à
 faire. Les notifications email, SMS et push disposent chacune d'un sender
 mock qui journalise le canal, le destinataire simulé et le message ; aucun
 message n'est envoyé réellement.
 La création de compte accepte un pseudonyme et génère un `UserId` basé sur un
 UUID. Les comptes sont conservés en mémoire uniquement ; les préférences
-musicales sont stockées séparément avec un morceau de secours et une liste de
-morceaux par combinaison jour de semaine / météo. Les réglages de réveil
+musicales sont stockées séparément avec une source distante préférée, un morceau
+de secours et une liste de morceaux par combinaison jour de semaine / météo.
+Les réglages de réveil
 (canal de notification et heure locale) sont également séparés. Lors d'un
 appel de réveil, un morceau est choisi aléatoirement dans la liste de la
 condition reçue, puis envoyé par l'adaptateur du canal choisi. L'heure est
@@ -45,6 +47,7 @@ Exemple de préférences musicales :
 
 ```json
 {
+  "preferredSource": "MUSICBRAINZ",
   "fallbackTrack": "Morceau de secours",
   "conditions": [
     {
@@ -62,8 +65,11 @@ Exemple de préférences musicales :
 ```
 
 Chaque condition combine les noms enum Java `DayOfWeek` et `WeatherType`. Les
-conditions dupliquées, les morceaux vides et les champs requis manquants
-renvoient `400 Bad Request` ; un `userId` inexistant renvoie `404 Not Found`.
+sources disponibles sont `ITUNES` et `MUSICBRAINZ`. La source préférée est
+essayée en premier, puis les autres sources configurées, avant le fallback
+local. Les conditions dupliquées, les morceaux vides et les champs requis
+manquants renvoient `400 Bad Request` ; un `userId` inexistant renvoie
+`404 Not Found`.
 Le stockage en mémoire est perdu au redémarrage. Ce endpoint ne configure pas
 le canal de notification ou l'heure, et l'ordonnanceur n'est pas encore exposé.
 
@@ -115,6 +121,8 @@ src/main/java/fr/reveil/musical/
 ├── application/
 │   ├── port/
 │   │   ├── NotificationAdapter.java
+│   │   ├── PreferredTrackProvider.java
+│   │   ├── SourceTrackProvider.java
 │   │   ├── TrackProvider.java
 │   │   ├── TrackProviderException.java
 │   │   ├── UserAccountRepository.java
@@ -155,6 +163,7 @@ src/main/java/fr/reveil/musical/
 └── domain/
     ├── NotificationChannel.java
     ├── MusicCondition.java
+    ├── MusicSource.java
     ├── Track.java
     ├── UserAccount.java
     ├── UserId.java

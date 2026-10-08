@@ -8,11 +8,13 @@ import java.util.Objects;
 
 public record UserMusicPreferences(
         Map<MusicCondition, List<String>> tracksByCondition,
-        String fallbackTrack) {
+        String fallbackTrack,
+        MusicSource preferredSource) {
 
     public UserMusicPreferences {
         Objects.requireNonNull(tracksByCondition, "tracksByCondition must not be null");
         Objects.requireNonNull(fallbackTrack, "fallbackTrack must not be null");
+        Objects.requireNonNull(preferredSource, "preferredSource must not be null");
         fallbackTrack = normalizeTitle(fallbackTrack, "fallbackTrack");
 
         Map<MusicCondition, List<String>> immutableTracks = new HashMap<>();

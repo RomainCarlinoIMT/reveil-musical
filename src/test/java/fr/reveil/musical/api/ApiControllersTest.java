@@ -2,6 +2,7 @@ package fr.reveil.musical.api;
 
 import fr.reveil.musical.application.service.UserMusicPreferencesService;
 import fr.reveil.musical.domain.MusicCondition;
+import fr.reveil.musical.domain.MusicSource;
 import fr.reveil.musical.domain.UserId;
 import fr.reveil.musical.domain.WeatherType;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,7 @@ class ApiControllersTest {
 
         HttpResponse<String> response = post("/api/users/" + userId + "/music-preferences", """
                 {
+                  "preferredSource":"MUSICBRAINZ",
                   "fallbackTrack":"Fallback song",
                   "conditions":[
                     {
@@ -72,12 +74,13 @@ class ApiControllersTest {
         MusicCondition condition = new MusicCondition(DayOfWeek.MONDAY, WeatherType.SOLEIL);
         assertEquals(List.of("Song one", "Song two"), preferences.tracksByCondition().get(condition));
         assertEquals("Fallback song", preferences.fallbackTrack());
+        assertEquals(MusicSource.MUSICBRAINZ, preferences.preferredSource());
     }
 
     @Test
     void rejectsMusicPreferencesForAnUnknownUser() throws Exception {
         HttpResponse<String> response = post("/api/users/" + UUID.randomUUID() + "/music-preferences", """
-                {"fallbackTrack":"Fallback song","conditions":[]}
+                {"preferredSource":"ITUNES","fallbackTrack":"Fallback song","conditions":[]}
                 """);
 
         assertEquals(404, response.statusCode());
@@ -92,6 +95,7 @@ class ApiControllersTest {
 
         HttpResponse<String> response = post("/api/users/" + userId + "/music-preferences", """
                 {
+                  "preferredSource":"ITUNES",
                   "fallbackTrack":"Fallback song",
                   "conditions":[
                     {"day":"MONDAY","weather":"SOLEIL","tracks":["Song one"]},
@@ -113,6 +117,7 @@ class ApiControllersTest {
 
         HttpResponse<String> response = post("/api/users/" + userId + "/music-preferences", """
                 {
+                  "preferredSource":"ITUNES",
                   "fallbackTrack":"Fallback song",
                   "conditions":[{"day":"MONDAY","tracks":["Song one"]}]
                 }
@@ -130,6 +135,21 @@ class ApiControllersTest {
 
         assertEquals(400, response.statusCode());
         assertTrue(response.body().contains("pseudonym must not be blank"));
+    }
+
+    @Test
+    void rejectsMusicPreferencesWithoutPreferredSource() throws Exception {
+        JsonNode createdUser = objectMapper.readTree(post("/api/users", """
+                {"pseudonym":"Camille"}
+                """).body());
+        String userId = createdUser.path("userId").asString();
+
+        HttpResponse<String> response = post("/api/users/" + userId + "/music-preferences", """
+                {"fallbackTrack":"Fallback song","conditions":[]}
+                """);
+
+        assertEquals(400, response.statusCode());
+        assertTrue(response.body().contains("preferredSource must be provided"));
     }
 
     private HttpResponse<String> post(String path, String body) throws Exception {

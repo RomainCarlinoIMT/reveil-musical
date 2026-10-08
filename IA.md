@@ -42,3 +42,12 @@ Le prochain objectif est de mettre en place, la base de l'API, l'idéal serait u
 ```
 
 Ici j'ai demander de mettre en place la partie API de notre servir et indrectement de faire le lien entre toutes les parties précendentes. Il faut noter que l'IA à fait la remarque interresante de separer des préferences utilisateurs la partie purement utilisateur (methode d'envois, heure d'envois) et la partie musique. Cela a permis de repondre à mon besoin de basse de faire deux controlleurs pour éviter d'avoir du single point of failure et donc de repondre à l'exigence de l'énnoncer d'avoir un mode dégradder possible.
+
+## Prompt 6
+```
+En relisant les consignes il faudrait ajouter dans les préference de l'utilisatteurs la prise en compte de la sources de musique de préference. Cela va permettre de voir si le code est extensible facilement
+```
+
+Après relecture des consignes j'ai vu que je ne traitais pas le cas de la sources de préférence. J'ai donc donner comme simple consigne à l'IA d'ajouter ce champ. Ici c'est une erreur qui peut servir dans le sens ou ça me permet de tester si le code est extensible ou non, en réference à la consignes oral "imaginons que l'application peut passer à 200 000 utilisateur dans le future"
+
+Note : Les test unitaires me rassure sur la fiablité des modifications

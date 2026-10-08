@@ -1,7 +1,7 @@
 package fr.reveil.musical.application.service;
 
 import fr.reveil.musical.application.port.NotificationAdapter;
-import fr.reveil.musical.application.port.TrackProvider;
+import fr.reveil.musical.application.port.PreferredTrackProvider;
 import fr.reveil.musical.application.port.UserMusicPreferencesProvider;
 import fr.reveil.musical.application.port.UserPreferencesProvider;
 import fr.reveil.musical.application.port.WakeUpService;
@@ -21,13 +21,13 @@ public class WakeUpApplicationService implements WakeUpService {
 
     private final UserPreferencesProvider userPreferencesProvider;
     private final UserMusicPreferencesProvider userMusicPreferencesProvider;
-    private final TrackProvider trackProvider;
+    private final PreferredTrackProvider trackProvider;
     private final List<NotificationAdapter> notificationAdapters;
 
     public WakeUpApplicationService(
             UserPreferencesProvider userPreferencesProvider,
             UserMusicPreferencesProvider userMusicPreferencesProvider,
-            TrackProvider trackProvider,
+            PreferredTrackProvider trackProvider,
             List<NotificationAdapter> notificationAdapters) {
         this.userPreferencesProvider = userPreferencesProvider;
         this.userMusicPreferencesProvider = userMusicPreferencesProvider;
@@ -50,7 +50,7 @@ public class WakeUpApplicationService implements WakeUpService {
                 ? musicPreferences.fallbackTrack()
                 : preferredTracks.get(ThreadLocalRandom.current().nextInt(preferredTracks.size()));
 
-        Track track = resolveTrack(selectedTitle, musicPreferences.fallbackTrack());
+        Track track = resolveTrack(selectedTitle, musicPreferences);
         NotificationAdapter adapter = notificationAdapters.stream()
                 .filter(candidate -> candidate.channel() == preferences.notificationChannel())
                 .findFirst()
@@ -59,11 +59,11 @@ public class WakeUpApplicationService implements WakeUpService {
         adapter.send(request.userId(), track);
     }
 
-    private Track resolveTrack(String selectedTitle, String fallbackTitle) {
-        return trackProvider.findTrack(selectedTitle)
-                .or(() -> selectedTitle.equals(fallbackTitle)
+    private Track resolveTrack(String selectedTitle, UserMusicPreferences preferences) {
+        return trackProvider.findTrack(selectedTitle, preferences.preferredSource())
+                .or(() -> selectedTitle.equals(preferences.fallbackTrack())
                         ? java.util.Optional.empty()
-                        : trackProvider.findTrack(fallbackTitle))
+                        : trackProvider.findTrack(preferences.fallbackTrack(), preferences.preferredSource()))
                 .orElseThrow(() -> new IllegalStateException(
                         "No track could be resolved for selected or fallback title"));
     }

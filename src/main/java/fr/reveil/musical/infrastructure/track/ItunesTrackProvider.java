@@ -1,7 +1,8 @@
 package fr.reveil.musical.infrastructure.track;
 
-import fr.reveil.musical.application.port.TrackProvider;
+import fr.reveil.musical.application.port.SourceTrackProvider;
 import fr.reveil.musical.application.port.TrackProviderException;
+import fr.reveil.musical.domain.MusicSource;
 import fr.reveil.musical.domain.Track;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 @Component("itunesTrackProvider")
-public class ItunesTrackProvider implements TrackProvider {
+public class ItunesTrackProvider implements SourceTrackProvider {
 
     private static final String PROVIDER = "iTunes";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
@@ -42,6 +43,11 @@ public class ItunesTrackProvider implements TrackProvider {
         this.cache = cache;
         this.rateLimiter = rateLimiter;
         this.searchUri = searchUri;
+    }
+
+    @Override
+    public MusicSource source() {
+        return MusicSource.ITUNES;
     }
 
     @Override
