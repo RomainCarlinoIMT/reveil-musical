@@ -4,10 +4,10 @@ Socle initial du projet décrit dans `TP_reveil_musical.pdf`. Le projet utilise
 Java et Spring Boot pour préparer l'injection de dépendances (IoC), avec une
 séparation entre le domaine et les ports d'accès aux fournisseurs.
 
-Cette base ne contient pas encore les intégrations iTunes/MusicBrainz, les
-mocks de notification, l'ordonnancement ou l'orchestration complète du réveil.
-Les adaptateurs techniques seront ajoutés derrière les interfaces sans exposer
-leurs détails au domaine.
+Les sources musicales iTunes et MusicBrainz sont intégrées derrière
+`TrackProvider`. Un fournisseur composite tente iTunes, puis MusicBrainz, avant
+de choisir un morceau local en secours. Les mocks de notification,
+l'ordonnancement et l'orchestration complète du réveil restent à faire.
 
 ## Prérequis et commandes
 
@@ -19,7 +19,21 @@ mvn test
 mvn spring-boot:run
 ```
 
-Le démarrage lance le contexte Spring Boot. Aucun service externe n'est appelé.
+Le démarrage lance le contexte Spring Boot. Aucun service externe n'est appelé
+avant une recherche de morceau. Pour activer MusicBrainz, définir un User-Agent
+conforme aux consignes de l'API, avec un contact permettant de joindre
+l'application :
+
+```sh
+MUSICBRAINZ_USER_AGENT="ReveilMusical/1.0 (contact: votre-adresse@example.org)" mvn spring-boot:run
+```
+
+iTunes est appelé sans clé API. Les deux fournisseurs utilisent un cache en
+mémoire (maximum 1 000 recherches, 24 h pour un morceau trouvé, 5 min pour
+aucun résultat) et limitent les appels non cachés à un toutes les 3 s pour
+iTunes et un par seconde pour MusicBrainz. En cas d'échec technique ou
+d'absence de résultat, le fournisseur composite journalise le mode dégradé et
+choisit un morceau local.
 
 ## Structure initiale
 
@@ -30,8 +44,18 @@ src/main/java/fr/reveil/musical/
 │   └── port/
 │       ├── NotificationAdapter.java
 │       ├── TrackProvider.java
+│       ├── TrackProviderException.java
 │       ├── UserPreferencesProvider.java
 │       └── WakeUpService.java
+├── infrastructure/
+│   └── track/
+│       ├── FallbackTrackProvider.java
+│       ├── ItunesTrackProvider.java
+│       ├── MusicBrainzTrackProvider.java
+│       ├── ResilientTrackProvider.java
+│       ├── TrackHttpConfiguration.java
+│       ├── TrackSearchCache.java
+│       └── TrackSearchRateLimiter.java
 └── domain/
     ├── NotificationChannel.java
     ├── Track.java
@@ -45,8 +69,10 @@ src/main/java/fr/reveil/musical/
   fournisseurs externes.
 - `application.port` décrit les contrats à implémenter pour lire les
   préférences, rechercher un morceau et envoyer une notification.
-- Les futurs adaptateurs devront être fournis par Spring et injectés par
-  constructeur. Aucune implémentation concrète n'est instanciée dans cette base.
+- `infrastructure.track` contient les adaptateurs iTunes et MusicBrainz, le
+  catalogue de secours, ainsi que le fournisseur composite Spring-injecté.
+- Les adaptateurs sont injectés par constructeur ; le domaine ne dépend ni de
+  Spring ni des formats spécifiques des API.
 - `Track` ne transporte pas l'URL spécifique à iTunes : ce détail reste dans
   l'adaptateur correspondant.
 
@@ -62,6 +88,8 @@ installées dans l'environnement de développement.
 | Apache Maven | 3.9.11 installé | Apache-2.0 | Apache Maven 3.10.0 est la dernière version stable annoncée ; Maven est un outil de build local, pas une dépendance livrée par l'application. |
 | `spring-boot-maven-plugin` | 4.1.1 | Apache-2.0 | Plugin d'exécution empaqueté avec Spring Boot ; version gérée par le parent Spring Boot. |
 | `maven-compiler-plugin`, `maven-resources-plugin`, `maven-surefire-plugin` | 3.15.0, 3.5.0, 3.5.6 | Apache-2.0 | Plugins de compilation, ressources et tests gérés par le parent Spring Boot ; outils de build uniquement. |
+| `jackson-databind`, `jackson-core` (Jackson 3) | 3.1.5 | Apache-2.0 | Utilisés pour lire les réponses JSON ; version gérée par le BOM de Spring Boot 4.1.1. Jackson 3.2.3 est plus récent ; on conserve la version du BOM pour éviter une surcharge qui pourrait introduire une incompatibilité. |
+| `jackson-annotations` (Jackson 2) | 2.21 | Apache-2.0 | Dépendance transitive du module Jackson 3, version gérée par le BOM Spring Boot ; 2.21.5 est plus récente mais reste non surchargée pour préserver l'alignement du BOM. |
 | `spring-boot-starter`, `spring-boot-starter-logging`, `spring-boot-autoconfigure`, `spring-boot`, `spring-boot-test` | 4.1.1 | Apache-2.0 | Version stable proposée par Spring Initializr. Gérée par le parent/BOM Spring Boot ; aucune surcharge de version. |
 | `spring-context`, `spring-aop`, `spring-beans`, `spring-expression`, `spring-core`, `spring-test` | 7.0.9 | Apache-2.0 | Versions choisies et gérées par le BOM stable Spring Boot 4.1.1. |
 | `micrometer-observation`, `micrometer-commons` | 1.17.1 | Apache-2.0 | Versions choisies et gérées par le BOM stable Spring Boot 4.1.1. |
@@ -90,6 +118,8 @@ Sources de vérification :
 - [Spring Initializr (versions prises en charge)](https://start.spring.io/metadata/client)
 - [Licence Spring Boot](https://github.com/spring-projects/spring-boot/blob/main/LICENSE.txt)
 - [Maven Central - parent Spring Boot 4.1.1](https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-parent/4.1.1/spring-boot-starter-parent-4.1.1.pom)
+- [Maven Central - Jackson Databind 3.1.5](https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-databind/3.1.5/jackson-databind-3.1.5.pom)
+- [MusicBrainz - politique de limitation](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting)
 - [OpenJDK - GPLv2 avec Classpath Exception](https://openjdk.org/legal/gplv2+ce.html)
 - [Versions Apache Maven](https://maven.apache.org/download.cgi)
 - [Versions OpenJDK disponibles](https://jdk.java.net/)
