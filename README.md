@@ -1,2 +1,95 @@
-# reveil-musical
-TP — Réveil musical
+# Réveil musical
+
+Socle initial du projet décrit dans `TP_reveil_musical.pdf`. Le projet utilise
+Java et Spring Boot pour préparer l'injection de dépendances (IoC), avec une
+séparation entre le domaine et les ports d'accès aux fournisseurs.
+
+Cette base ne contient pas encore les intégrations iTunes/MusicBrainz, les
+mocks de notification, l'ordonnancement ou l'orchestration complète du réveil.
+Les adaptateurs techniques seront ajoutés derrière les interfaces sans exposer
+leurs détails au domaine.
+
+## Prérequis et commandes
+
+- JDK 25 ou supérieur
+- Maven 3.9+
+
+```sh
+mvn test
+mvn spring-boot:run
+```
+
+Le démarrage lance le contexte Spring Boot. Aucun service externe n'est appelé.
+
+## Structure initiale
+
+```text
+src/main/java/fr/reveil/musical/
+├── ReveilMusicalApplication.java
+├── application/
+│   └── port/
+│       ├── NotificationAdapter.java
+│       ├── TrackProvider.java
+│       ├── UserPreferencesProvider.java
+│       └── WakeUpService.java
+└── domain/
+    ├── NotificationChannel.java
+    ├── Track.java
+    ├── UserId.java
+    ├── UserWakeUpPreferences.java
+    ├── WakeUpRequest.java
+    └── WeatherType.java
+```
+
+- `domain` contient uniquement des types métier indépendants de Spring et des
+  fournisseurs externes.
+- `application.port` décrit les contrats à implémenter pour lire les
+  préférences, rechercher un morceau et envoyer une notification.
+- Les futurs adaptateurs devront être fournis par Spring et injectés par
+  constructeur. Aucune implémentation concrète n'est instanciée dans cette base.
+- `Track` ne transporte pas l'URL spécifique à iTunes : ce détail reste dans
+  l'adaptateur correspondant.
+
+## Dépendances, licences et fraîcheur
+
+Vérification effectuée le 8 octobre 2026 à partir des métadonnées Maven Central,
+de Spring Initializr, des pages officielles des projets et des versions
+installées dans l'environnement de développement.
+
+| Composant(s) Maven résolu(s) | Version | Licence | Fraîcheur / remarque |
+|---|---:|---|---|
+| OpenJDK | 25 (25.0.4 installé) | GPLv2 avec Classpath Exception | Java 25 est la version LTS ciblée. JDK 27 est la version GA la plus récente au moment de la vérification ; le projet reste sur la LTS pour privilégier la stabilité. |
+| Apache Maven | 3.9.11 installé | Apache-2.0 | Apache Maven 3.10.0 est la dernière version stable annoncée ; Maven est un outil de build local, pas une dépendance livrée par l'application. |
+| `spring-boot-maven-plugin` | 4.1.1 | Apache-2.0 | Plugin d'exécution empaqueté avec Spring Boot ; version gérée par le parent Spring Boot. |
+| `maven-compiler-plugin`, `maven-resources-plugin`, `maven-surefire-plugin` | 3.15.0, 3.5.0, 3.5.6 | Apache-2.0 | Plugins de compilation, ressources et tests gérés par le parent Spring Boot ; outils de build uniquement. |
+| `spring-boot-starter`, `spring-boot-starter-logging`, `spring-boot-autoconfigure`, `spring-boot`, `spring-boot-test` | 4.1.1 | Apache-2.0 | Version stable proposée par Spring Initializr. Gérée par le parent/BOM Spring Boot ; aucune surcharge de version. |
+| `spring-context`, `spring-aop`, `spring-beans`, `spring-expression`, `spring-core`, `spring-test` | 7.0.9 | Apache-2.0 | Versions choisies et gérées par le BOM stable Spring Boot 4.1.1. |
+| `micrometer-observation`, `micrometer-commons` | 1.17.1 | Apache-2.0 | Versions choisies et gérées par le BOM stable Spring Boot 4.1.1. |
+| `logback-classic`, `logback-core` | 1.5.38 | EPL-1.0 ou LGPL-2.1 | Licence au choix du redistributeur ; versions gérées par le BOM stable Spring Boot 4.1.1. |
+| `log4j-to-slf4j`, `log4j-api` | 2.25.5 | Apache-2.0 | Versions gérées par le BOM stable Spring Boot 4.1.1. |
+| `jul-to-slf4j`, `slf4j-api` | 2.0.18 | MIT | Versions gérées par le BOM stable Spring Boot 4.1.1. |
+| `jakarta.annotation-api` | 3.0.0 | EPL-2.0 ou GPL-2.0 avec Classpath Exception | Double licence ; versions gérées par le BOM stable Spring Boot 4.1.1. |
+| `snakeyaml` | 2.6 | Apache-2.0 | Version gérée par le BOM stable Spring Boot 4.1.1. |
+| `commons-logging` | 1.3.6 | Apache-2.0 | Version gérée par le BOM stable Spring Boot 4.1.1. |
+| `jspecify` | 1.0.1 | Apache-2.0 | Version gérée par le BOM stable Spring Boot 4.1.1. |
+| `junit-jupiter`, `junit-jupiter-api`, `junit-jupiter-params`, `junit-jupiter-engine`, `junit-platform-commons`, `junit-platform-engine` | 6.0.3 | EPL-2.0 | Framework de tests ; versions gérées par le BOM stable Spring Boot 4.1.1. |
+| `opentest4j` | 1.3.0 | Apache-2.0 | Version gérée par le BOM stable Spring Boot 4.1.1. |
+| `apiguardian-api` | 1.1.2 | Apache-2.0 | Version gérée par le BOM stable Spring Boot 4.1.1. |
+
+Les versions Maven effectives des dépendances de production et de test ont été
+relevées dans l'arbre `mvn dependency:tree`. Les versions transitives sont
+alignées sur le BOM stable Spring Boot 4.1.1 (aucune version n'est surchargée
+individuellement). Le socle de test est volontairement limité à Spring Test et
+JUnit ; il n'ajoute pas de bibliothèques de mock ou d'assertions tierces.
+Vérifier à nouveau licence et fraîcheur avant toute mise à jour du BOM ou
+ajout de dépendance.
+
+Sources de vérification :
+
+- [Spring Boot](https://spring.io/projects/spring-boot)
+- [Spring Initializr (versions prises en charge)](https://start.spring.io/metadata/client)
+- [Licence Spring Boot](https://github.com/spring-projects/spring-boot/blob/main/LICENSE.txt)
+- [Maven Central - parent Spring Boot 4.1.1](https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-parent/4.1.1/spring-boot-starter-parent-4.1.1.pom)
+- [OpenJDK - GPLv2 avec Classpath Exception](https://openjdk.org/legal/gplv2+ce.html)
+- [Versions Apache Maven](https://maven.apache.org/download.cgi)
+- [Versions OpenJDK disponibles](https://jdk.java.net/)
