@@ -8,6 +8,9 @@ Les sources musicales iTunes et MusicBrainz sont intégrées derrière
 `TrackProvider`. Un fournisseur composite tente iTunes, puis MusicBrainz, avant
 de choisir un morceau local en secours. Les mocks de notification,
 l'ordonnancement et l'orchestration complète du réveil restent à faire.
+Les notifications email, SMS et push disposent maintenant chacune d'un sender
+mock qui journalise le canal, le destinataire simulé et le message ; aucun
+message n'est envoyé réellement.
 
 ## Prérequis et commandes
 
@@ -52,6 +55,19 @@ src/main/java/fr/reveil/musical/
 │       ├── UserPreferencesProvider.java
 │       └── WakeUpService.java
 ├── infrastructure/
+│   ├── notification/
+│   │   ├── email/
+│   │   │   ├── EmailNotificationAdapter.java
+│   │   │   ├── EmailSender.java
+│   │   │   └── MockEmailSender.java
+│   │   ├── push/
+│   │   │   ├── PushNotificationAdapter.java
+│   │   │   ├── PushSender.java
+│   │   │   └── MockPushSender.java
+│   │   └── sms/
+│   │       ├── MockSmsSender.java
+│   │       ├── SmsNotificationAdapter.java
+│   │       └── SmsSender.java
 │   └── track/
 │       ├── FallbackTrackProvider.java
 │       ├── ItunesTrackProvider.java
@@ -75,10 +91,15 @@ src/main/java/fr/reveil/musical/
   préférences, rechercher un morceau et envoyer une notification.
 - `infrastructure.track` contient les adaptateurs iTunes et MusicBrainz, le
   catalogue de secours, ainsi que le fournisseur composite Spring-injecté.
+- `infrastructure.notification` contient un mock et un adaptateur par canal.
+  Les méthodes des senders sont volontairement différentes ; chaque adaptateur
+  les ramène à l'interface commune `NotificationAdapter`.
 - Les adaptateurs sont injectés par constructeur ; le domaine ne dépend ni de
   Spring ni des formats spécifiques des API.
 - `Track` ne transporte pas l'URL spécifique à iTunes : ce détail reste dans
   l'adaptateur correspondant.
+- En l'absence de coordonnées utilisateur dans le modèle actuel, l'identifiant
+  utilisateur sert uniquement de destinataire simulé dans les logs.
 
 ## Dépendances, licences et fraîcheur
 
@@ -113,6 +134,8 @@ relevées dans l'arbre `mvn dependency:tree`. Les versions transitives sont
 alignées sur le BOM stable Spring Boot 4.1.1 (aucune version n'est surchargée
 individuellement). Le socle de test est volontairement limité à Spring Test et
 JUnit ; il n'ajoute pas de bibliothèques de mock ou d'assertions tierces.
+Les mocks de notification utilisent SLF4J fourni transitivement par Spring
+Boot ; aucune nouvelle dépendance n'a été ajoutée pour eux.
 Vérifier à nouveau licence et fraîcheur avant toute mise à jour du BOM ou
 ajout de dépendance.
 

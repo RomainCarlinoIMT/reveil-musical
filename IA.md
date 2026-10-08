@@ -15,3 +15,10 @@ La, prochaine étape est de créer les classes qui implémente TrackProvider. Il
 ```
 
 Ayant les interfaces prête j'ai choisi comme orientation de commencer par les rêquetes d'API externe. J'ai bien préciser de suivre les interfaces existante pour éviter que l'IA ne se dispères trop. Et j'ai choisi de faire en sorte que l'une des implementation soit le service de fallback.
+
+## Prompt 3
+```
+Maintenant le but est de mettre en place des implémentation pour l'envois des notifications. Le but n'est pas de faire tout de suite la liason avec les recherche déjà mise en place. Il faudra bien créer différente classes mais pas d'envois de messages réel. l'utilisation de log précissant le type d'envois et le message de l'envois est suffisant.
+```
+
+Ici j'ai choisit de mettre en place les notifications car c'est un module qui a été assez bien découper donc sont implementation ne devrais pas trop changer pour la suite du tp. Mais il reste toujours extensible pour le future.
