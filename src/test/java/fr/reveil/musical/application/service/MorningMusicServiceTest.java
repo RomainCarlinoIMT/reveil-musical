@@ -1,7 +1,7 @@
 package fr.reveil.musical.application.service;
 
 import fr.reveil.musical.domain.MusicCondition;
-import fr.reveil.musical.domain.MusicSource;
+import fr.reveil.musical.domain.MusicSourceId;
 import fr.reveil.musical.domain.UserAccount;
 import fr.reveil.musical.domain.UserId;
 import fr.reveil.musical.domain.UserMusicPreferences;
@@ -61,6 +61,6 @@ class MorningMusicServiceTest {
     private void savePreferences(Map<MusicCondition, List<String>> tracksByCondition, String fallbackTrack) {
         accounts.save(new UserAccount(USER_ID, "Camille"));
         preferencesService.save(USER_ID,
-                new UserMusicPreferences(tracksByCondition, fallbackTrack, MusicSource.ITUNES));
+                new UserMusicPreferences(tracksByCondition, fallbackTrack, new MusicSourceId("itunes")));
     }
 }

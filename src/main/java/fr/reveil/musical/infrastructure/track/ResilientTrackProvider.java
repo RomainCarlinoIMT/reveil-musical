@@ -3,8 +3,7 @@ package fr.reveil.musical.infrastructure.track;
 import fr.reveil.musical.application.port.PreferredTrackProvider;
 import fr.reveil.musical.application.port.SourceTrackProvider;
 import fr.reveil.musical.application.port.TrackProvider;
-import fr.reveil.musical.application.port.TrackProviderException;
-import fr.reveil.musical.domain.MusicSource;
+import fr.reveil.musical.domain.MusicSourceId;
 import fr.reveil.musical.domain.Track;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,9 +11,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,61 +23,68 @@ public class ResilientTrackProvider implements PreferredTrackProvider {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ResilientTrackProvider.class);
 
-    private final Map<MusicSource, SourceTrackProvider> remoteProviders;
+    private final List<SourceTrackProvider> remoteProviders;
     private final TrackProvider fallback;
 
     public ResilientTrackProvider(
             List<SourceTrackProvider> remoteProviders,
             @Qualifier("fallbackTrackProvider") TrackProvider fallback) {
-        EnumMap<MusicSource, SourceTrackProvider> providersBySource = new EnumMap<>(MusicSource.class);
+        Map<MusicSourceId, SourceTrackProvider> providersBySource = new HashMap<>();
         for (SourceTrackProvider provider : remoteProviders) {
-            SourceTrackProvider previous = providersBySource.putIfAbsent(provider.source(), provider);
+            MusicSourceId sourceId = Objects.requireNonNull(
+                    provider.sourceId(), "provider sourceId must not be null");
+            SourceTrackProvider previous = providersBySource.putIfAbsent(sourceId, provider);
             if (previous != null) {
-                throw new IllegalArgumentException("More than one track provider configured for " + provider.source());
+                throw new IllegalArgumentException(
+                        "More than one track provider configured for " + sourceId.value());
             }
         }
-        this.remoteProviders = Map.copyOf(providersBySource);
+        this.remoteProviders = List.copyOf(remoteProviders);
         this.fallback = fallback;
     }
 
     @Override
-    public Optional<Track> findTrack(String title, MusicSource preferredSource) {
-        if (title == null || title.isBlank()) {
-            throw new IllegalArgumentException("Track title must not be blank");
-        }
+    public Optional<Track> findTrack(String title) {
+        return findTrack(title, Optional.empty());
+    }
+
+    @Override
+    public Optional<Track> findTrack(String title, Optional<MusicSourceId> preferredSource) {
+        validateTitle(title);
         Objects.requireNonNull(preferredSource, "preferredSource must not be null");
 
-        for (MusicSource source : searchOrder(preferredSource)) {
-            SourceTrackProvider provider = remoteProviders.get(source);
-            if (provider == null) {
-                continue;
-            }
+        List<SourceTrackProvider> orderedProviders = preferredSource
+                .map(source -> remoteProviders.stream()
+                        .sorted((first, second) -> Boolean.compare(
+                                !first.sourceId().equals(source),
+                                !second.sourceId().equals(source)))
+                        .toList())
+                .orElse(remoteProviders);
+        return searchProviders(title, orderedProviders);
+    }
+
+    private Optional<Track> searchProviders(String title, List<SourceTrackProvider> providers) {
+        for (SourceTrackProvider provider : providers) {
             Optional<Track> track = searchRemote(provider, title);
             if (track.isPresent()) {
                 return track;
             }
         }
-
         LOGGER.warn("Remote track providers returned no track; using the local fallback");
         return fallback.findTrack(title);
     }
 
-    private List<MusicSource> searchOrder(MusicSource preferredSource) {
-        List<MusicSource> order = new ArrayList<>();
-        order.add(preferredSource);
-        for (MusicSource source : MusicSource.values()) {
-            if (source != preferredSource) {
-                order.add(source);
-            }
+    private void validateTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Track title must not be blank");
         }
-        return order;
     }
 
     private Optional<Track> searchRemote(SourceTrackProvider provider, String title) {
         try {
             return provider.findTrack(title);
-        } catch (TrackProviderException exception) {
-            LOGGER.warn("Track provider failed; trying the next source", exception);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Track provider {} failed; trying the next source", provider.sourceId().value(), exception);
             return Optional.empty();
         }
     }

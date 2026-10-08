@@ -6,6 +6,7 @@ import fr.reveil.musical.domain.UserId;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import java.util.NoSuchElementException;
 
 @Service
 public class UserAccountService {
@@ -30,5 +31,14 @@ public class UserAccountService {
                 normalizedPseudonym);
         userAccountRepository.save(account);
         return account;
+    }
+
+    public UserAccount get(UserId userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId must not be null");
+        }
+        return userAccountRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "No user account found for ID " + userId.value()));
     }
 }

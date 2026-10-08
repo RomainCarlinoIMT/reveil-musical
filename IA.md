@@ -41,7 +41,7 @@ Après avoir la base de tout les autres composants, j'ai finalement mis en place
 Le prochain objectif est de mettre en place, la base de l'API, l'idéal serait une API du type REST. Le but est de faire pour le moment seulement la gestion de la création d'un utlisateur et d'ajout des préférence de musique. Il faudrait idéalment créer un controlleur specifique pour chaque besoin (un pour l'utilisateur et un pour les pref).
 ```
 
-Ici j'ai demander de mettre en place la partie API de notre servir et indrectement de faire le lien entre toutes les parties précendentes. Il faut noter que l'IA à fait la remarque interresante de separer des préferences utilisateurs la partie purement utilisateur (methode d'envois, heure d'envois) et la partie musique. Cela a permis de repondre à mon besoin de basse de faire deux controlleurs pour éviter d'avoir du single point of failure et donc de repondre à l'exigence de l'énnoncer d'avoir un mode dégradder possible.
+Ici j'ai demandé de mettre en place la partie API du service et de faire le lien entre les composants précédents. La séparation des contrôleurs et des préférences clarifie les responsabilités et aide à faire évoluer les composants indépendamment. Elle ne supprime toutefois pas un point unique de défaillance au niveau de l'application lorsqu'elle est déployée en une seule instance ; un mode dégradé applicatif n'est pas à lui seul une garantie de haute disponibilité.
 
 ## Prompt 6
 ```
@@ -58,3 +58,25 @@ Maintenant le coeur du projet, mettre en place la réponse de l'API aux appels m
 ```
 
 Finallité du TP, la mise en place de la dernière brique manquante, l'API, vu que tout est déjà en place l'ordre donner à l'IA est explicte faire le lien final entre tout les composants. Avec des précisions dans le prompt pour bien sure que la nouvelle route crée répond bien aux exigances du TP.
+
+## Prompt 7 Retour de claude sur le projet
+Correction proposer par Claude:
+```
+Dans wakeUp, entourer l’envoi d’un try/catch avec repli sur un autre canal (ou au minimum un log d’erreur et un canal par défaut), gérer l’absence de préférences avec des valeurs par défaut, et attraper RuntimeException dans ResilientTrackProvider. Ajouter les tests correspondants.
+Remplacer MusicSource par un identifiant opaque et retirer le default ITUNES du port.
+Exposer un point d’entrée wakeUp (endpoint ou runner de démo) et un endpoint pour le canal.
+Ajouter JaCoCo et viser un chiffre assumé.
+Compléter la colonne fraîcheur du README et corriger IA.md sur le point du single point of failure.
+```
+
+Prompt de correction utiliser:
+```
+Après analyse du code il y a des points a corriger. La partie IOC est solide, mais il a des manquement dans la robustess de l'application globale. Voici la liste des fixs proposer:
+Dans wakeUp, entourer l’envoi d’un try/catch avec repli sur un autre canal (ou au minimum un log d’erreur et un canal par défaut), gérer l’absence de préférences avec des valeurs par défaut, et attraper RuntimeException dans ResilientTrackProvider. Ajouter les tests correspondants.
+Remplacer MusicSource par un identifiant opaque et retirer le default ITUNES du port.
+Exposer un point d’entrée wakeUp (endpoint ou runner de démo) et un endpoint pour le canal.
+Ajouter JaCoCo et viser un chiffre assumé.
+Compléter la colonne fraîcheur du README et corriger IA.md sur le point du single point of failure.
+```
+
+Cela à ajouter pas mal de fixes, notament du coverage avec jacoco (84% de coverage) ce qui est pas mal au vu des consignes. A voir si le deuxième test est meilleurs au niveau de claude.

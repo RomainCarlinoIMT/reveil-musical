@@ -1,8 +1,8 @@
 package fr.reveil.musical.application.port;
 
-import fr.reveil.musical.domain.MusicSource;
+import fr.reveil.musical.domain.MusicSourceId;
 
 public interface SourceTrackProvider extends TrackProvider {
 
-    MusicSource source();
+    MusicSourceId sourceId();
 }

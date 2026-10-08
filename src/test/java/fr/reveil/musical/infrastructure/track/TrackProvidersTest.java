@@ -3,7 +3,7 @@ package fr.reveil.musical.infrastructure.track;
 import com.sun.net.httpserver.HttpServer;
 import fr.reveil.musical.application.port.TrackProviderException;
 import fr.reveil.musical.application.port.SourceTrackProvider;
-import fr.reveil.musical.domain.MusicSource;
+import fr.reveil.musical.domain.MusicSourceId;
 import fr.reveil.musical.domain.Track;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,29 +113,33 @@ class TrackProvidersTest {
     @Test
     void resilientProviderUsesTheHardcodedFallbackWhenRemoteProvidersFail() {
         FallbackTrackProvider fallback = new FallbackTrackProvider();
+        MusicSourceId itunesId = new MusicSourceId("itunes");
+        MusicSourceId musicBrainzId = new MusicSourceId("musicbrainz");
         ResilientTrackProvider provider = new ResilientTrackProvider(
                 List.of(
-                        sourceProvider(MusicSource.ITUNES, title -> {
+                        sourceProvider(itunesId, title -> {
                             throw new TrackProviderException("iTunes", "Unavailable");
                         }),
-                        sourceProvider(MusicSource.MUSICBRAINZ, title -> {
+                        sourceProvider(musicBrainzId, title -> {
                             throw new TrackProviderException("MusicBrainz", "Unavailable");
                         })),
                 fallback);
 
         assertEquals(Optional.of(new Track("Aube tranquille", "Réveil Musical")),
-                provider.findTrack("Aube tranquille", MusicSource.MUSICBRAINZ));
+                provider.findTrack("Aube tranquille", Optional.of(new MusicSourceId("musicbrainz"))));
     }
 
     @Test
     void searchesThePreferredMusicSourceBeforeOtherSources() {
-        AtomicReference<MusicSource> firstSource = new AtomicReference<>();
-        SourceTrackProvider itunes = sourceProvider(MusicSource.ITUNES, title -> {
-            firstSource.compareAndSet(null, MusicSource.ITUNES);
+        AtomicReference<MusicSourceId> firstSource = new AtomicReference<>();
+        MusicSourceId itunesId = new MusicSourceId("itunes");
+        MusicSourceId musicBrainzId = new MusicSourceId("musicbrainz");
+        SourceTrackProvider itunes = sourceProvider(itunesId, title -> {
+            firstSource.compareAndSet(null, itunesId);
             return Optional.of(new Track("iTunes result", "Artist"));
         });
-        SourceTrackProvider musicBrainz = sourceProvider(MusicSource.MUSICBRAINZ, title -> {
-            firstSource.compareAndSet(null, MusicSource.MUSICBRAINZ);
+        SourceTrackProvider musicBrainz = sourceProvider(musicBrainzId, title -> {
+            firstSource.compareAndSet(null, musicBrainzId);
             return Optional.of(new Track("MusicBrainz result", "Artist"));
         });
         ResilientTrackProvider provider = new ResilientTrackProvider(
@@ -143,22 +147,40 @@ class TrackProvidersTest {
                 new FallbackTrackProvider());
 
         assertEquals(Optional.of(new Track("MusicBrainz result", "Artist")),
-                provider.findTrack("Song title", MusicSource.MUSICBRAINZ));
-        assertEquals(MusicSource.MUSICBRAINZ, firstSource.get());
+                provider.findTrack("Song title", Optional.of(musicBrainzId)));
+        assertEquals(musicBrainzId, firstSource.get());
     }
 
     @Test
     void triesOtherSourcesBeforeUsingTheLocalFallback() {
-        SourceTrackProvider itunes = sourceProvider(MusicSource.ITUNES, title -> Optional.empty());
+        MusicSourceId itunesId = new MusicSourceId("itunes");
+        SourceTrackProvider itunes = sourceProvider(itunesId, title -> Optional.empty());
         SourceTrackProvider musicBrainz = sourceProvider(
-                MusicSource.MUSICBRAINZ,
+                new MusicSourceId("musicbrainz"),
                 title -> Optional.of(new Track("Found by MusicBrainz", "Artist")));
         ResilientTrackProvider provider = new ResilientTrackProvider(
                 List.of(itunes, musicBrainz),
                 new FallbackTrackProvider());
 
         assertEquals(Optional.of(new Track("Found by MusicBrainz", "Artist")),
-                provider.findTrack("Song title", MusicSource.ITUNES));
+                provider.findTrack("Song title", Optional.of(itunesId)));
+    }
+
+    @Test
+    void continuesWithNextSourceWhenProviderThrowsUnexpectedRuntimeException() {
+        MusicSourceId itunesId = new MusicSourceId("itunes");
+        MusicSourceId musicBrainzId = new MusicSourceId("musicbrainz");
+        ResilientTrackProvider provider = new ResilientTrackProvider(
+                List.of(
+                        sourceProvider(itunesId, title -> {
+                            throw new IllegalStateException("Unexpected provider failure");
+                        }),
+                        sourceProvider(musicBrainzId,
+                                title -> Optional.of(new Track("Recovered song", "Artist")))),
+                new FallbackTrackProvider());
+
+        assertEquals(Optional.of(new Track("Recovered song", "Artist")),
+                provider.findTrack("Song title", Optional.of(itunesId)));
     }
 
     @Test
@@ -191,12 +213,12 @@ class TrackProvidersTest {
     }
 
     private SourceTrackProvider sourceProvider(
-            MusicSource source,
+            MusicSourceId sourceId,
             Function<String, Optional<Track>> search) {
         return new SourceTrackProvider() {
             @Override
-            public MusicSource source() {
-                return source;
+            public MusicSourceId sourceId() {
+                return sourceId;
             }
 
             @Override

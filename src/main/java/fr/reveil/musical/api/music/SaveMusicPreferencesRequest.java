@@ -1,7 +1,7 @@
 package fr.reveil.musical.api.music;
 
 import fr.reveil.musical.domain.MusicCondition;
-import fr.reveil.musical.domain.MusicSource;
+import fr.reveil.musical.domain.MusicSourceId;
 import fr.reveil.musical.domain.UserMusicPreferences;
 
 import java.util.HashMap;
@@ -9,13 +9,13 @@ import java.util.List;
 import java.util.Map;
 
 public record SaveMusicPreferencesRequest(
-        MusicSource preferredSource,
+        String preferredSource,
         String fallbackTrack,
         List<MusicConditionRequest> conditions) {
 
     public UserMusicPreferences toDomain() {
-        if (preferredSource == null) {
-            throw new IllegalArgumentException("preferredSource must be provided");
+        if (preferredSource == null || preferredSource.isBlank()) {
+            throw new IllegalArgumentException("preferredSource must not be blank");
         }
         if (fallbackTrack == null || fallbackTrack.isBlank()) {
             throw new IllegalArgumentException("fallbackTrack must not be blank");
@@ -35,6 +35,6 @@ public record SaveMusicPreferencesRequest(
             }
         }
 
-        return new UserMusicPreferences(tracksByCondition, fallbackTrack, preferredSource);
+        return new UserMusicPreferences(tracksByCondition, fallbackTrack, new MusicSourceId(preferredSource));
     }
 }

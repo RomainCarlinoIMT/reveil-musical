@@ -48,4 +48,25 @@ class UserPreferencesServiceTest {
     void reportsMissingPreferencesExplicitly() {
         assertThrows(NoSuchElementException.class, () -> service.get(new UserId("user-without-preferences")));
     }
+
+    @Test
+    void returnsDocumentedDefaultsWhenAnExistingUserHasNoPreferences() {
+        UserId userId = new UserId("user-without-preferences");
+        accounts.save(new UserAccount(userId, "Camille"));
+
+        assertEquals(UserPreferencesService.DEFAULT_PREFERENCES, service.getOrDefault(userId));
+    }
+
+    @Test
+    void updatesNotificationChannelWithoutChangingTheWakeUpTime() {
+        UserId userId = new UserId("user-1");
+        accounts.save(new UserAccount(userId, "Camille"));
+        service.save(userId, new UserWakeUpPreferences(NotificationChannel.PUSH, LocalTime.of(6, 45)));
+
+        UserWakeUpPreferences updated = service.updateNotificationChannel(userId, NotificationChannel.SMS);
+
+        assertEquals(NotificationChannel.SMS, updated.notificationChannel());
+        assertEquals(LocalTime.of(6, 45), updated.sendTime());
+        assertEquals(updated, service.get(userId));
+    }
 }

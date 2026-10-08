@@ -5,7 +5,7 @@ import fr.reveil.musical.application.port.PreferredTrackProvider;
 import fr.reveil.musical.application.port.UserMusicPreferencesProvider;
 import fr.reveil.musical.application.port.UserPreferencesProvider;
 import fr.reveil.musical.domain.MusicCondition;
-import fr.reveil.musical.domain.MusicSource;
+import fr.reveil.musical.domain.MusicSourceId;
 import fr.reveil.musical.domain.NotificationChannel;
 import fr.reveil.musical.domain.Track;
 import fr.reveil.musical.domain.UserId;
@@ -36,16 +36,16 @@ class WakeUpApplicationServiceTest {
         UserMusicPreferences musicPreferences = musicPreferences(
                 Map.of(new MusicCondition(DayOfWeek.MONDAY, WeatherType.SOLEIL), titles),
                 "Fallback song",
-                MusicSource.MUSICBRAINZ);
+                new MusicSourceId("musicbrainz"));
         UserWakeUpPreferences wakeUpPreferences = wakeUpPreferences(NotificationChannel.SMS);
         AtomicReference<String> searchedTitle = new AtomicReference<>();
         AtomicReference<Track> sentTrack = new AtomicReference<>();
         AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
 
-        AtomicReference<MusicSource> searchedSource = new AtomicReference<>();
+        AtomicReference<MusicSourceId> searchedSource = new AtomicReference<>();
         PreferredTrackProvider trackProvider = (title, source) -> {
             searchedTitle.set(title);
-            searchedSource.set(source);
+            searchedSource.set(source.orElse(null));
             return Optional.of(new Track(title, "Artist"));
         };
         NotificationAdapter emailAdapter = notificationAdapter(NotificationChannel.EMAIL, sentChannel, sentTrack);
@@ -63,7 +63,7 @@ class WakeUpApplicationServiceTest {
         assertTrue(titles.contains(searchedTitle.get()));
         assertEquals(NotificationChannel.SMS, sentChannel.get());
         assertEquals(searchedTitle.get(), sentTrack.get().title());
-        assertEquals(MusicSource.MUSICBRAINZ, searchedSource.get());
+        assertEquals(new MusicSourceId("musicbrainz"), searchedSource.get());
     }
 
     @Test
@@ -125,6 +125,100 @@ class WakeUpApplicationServiceTest {
         assertEquals("Fallback song", sentTitle.get());
     }
 
+    @Test
+    void usesDefaultPreferencesWhenNoneAreStored() {
+        AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
+        AtomicReference<String> searchedTitle = new AtomicReference<>();
+        PreferredTrackProvider trackProvider = (title, preferredSource) -> {
+            searchedTitle.set(title);
+            assertTrue(preferredSource.isEmpty());
+            return Optional.of(new Track(title, "Réveil Musical"));
+        };
+        NotificationAdapter emailAdapter = notificationAdapter(
+                NotificationChannel.EMAIL, sentChannel, new AtomicReference<>());
+        WakeUpApplicationService service = new WakeUpApplicationService(
+                emptyPreferenceProvider(),
+                emptyMusicPreferenceProvider(),
+                trackProvider,
+                List.of(emailAdapter));
+
+        service.wakeUp(REQUEST);
+
+        assertEquals("Aube tranquille", searchedTitle.get());
+        assertEquals(NotificationChannel.EMAIL, sentChannel.get());
+    }
+
+    @Test
+    void retriesWithDefaultEmailWhenThePreferredChannelSendFails() {
+        AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
+        NotificationAdapter failingSmsAdapter = new NotificationAdapter() {
+            @Override
+            public NotificationChannel channel() {
+                return NotificationChannel.SMS;
+            }
+
+            @Override
+            public void send(UserId userId, Track track) {
+                throw new IllegalStateException("Notification service unavailable");
+            }
+        };
+        NotificationAdapter emailAdapter = notificationAdapter(
+                NotificationChannel.EMAIL, sentChannel, new AtomicReference<>());
+        PreferredTrackProvider trackProvider = (title, preferredSource) ->
+                Optional.of(new Track(title, "Artist"));
+        WakeUpApplicationService service = new WakeUpApplicationService(
+                preferenceProvider(wakeUpPreferences(NotificationChannel.SMS)),
+                musicPreferenceProvider(musicPreferences(Map.of(), "Fallback song")),
+                trackProvider,
+                List.of(failingSmsAdapter, emailAdapter));
+
+        service.wakeUp(REQUEST);
+
+        assertEquals(NotificationChannel.EMAIL, sentChannel.get());
+    }
+
+    @Test
+    void logsAndDoesNotPropagateWhenTheDefaultEmailChannelAlsoFails() {
+        NotificationAdapter failingEmailAdapter = new NotificationAdapter() {
+            @Override
+            public NotificationChannel channel() {
+                return NotificationChannel.EMAIL;
+            }
+
+            @Override
+            public void send(UserId userId, Track track) {
+                throw new IllegalStateException("Notification service unavailable");
+            }
+        };
+        PreferredTrackProvider trackProvider = (title, preferredSource) ->
+                Optional.of(new Track(title, "Artist"));
+        WakeUpApplicationService service = new WakeUpApplicationService(
+                preferenceProvider(wakeUpPreferences(NotificationChannel.EMAIL)),
+                musicPreferenceProvider(musicPreferences(Map.of(), "Fallback song")),
+                trackProvider,
+                List.of(failingEmailAdapter));
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.wakeUp(REQUEST));
+    }
+
+    @Test
+    void usesDefaultEmailChannelWhenThePreferredChannelAdapterIsUnavailable() {
+        AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
+        NotificationAdapter emailAdapter = notificationAdapter(
+                NotificationChannel.EMAIL, sentChannel, new AtomicReference<>());
+        PreferredTrackProvider trackProvider = (title, preferredSource) ->
+                Optional.of(new Track(title, "Artist"));
+        WakeUpApplicationService service = new WakeUpApplicationService(
+                preferenceProvider(wakeUpPreferences(NotificationChannel.PUSH)),
+                musicPreferenceProvider(musicPreferences(Map.of(), "Fallback song")),
+                trackProvider,
+                List.of(emailAdapter));
+
+        service.wakeUp(REQUEST);
+
+        assertEquals(NotificationChannel.EMAIL, sentChannel.get());
+    }
+
     private UserWakeUpPreferences wakeUpPreferences(NotificationChannel channel) {
         return new UserWakeUpPreferences(channel, LocalTime.of(7, 30));
     }
@@ -132,13 +226,13 @@ class WakeUpApplicationServiceTest {
     private UserMusicPreferences musicPreferences(
             Map<MusicCondition, List<String>> tracksByCondition,
             String fallback) {
-        return musicPreferences(tracksByCondition, fallback, MusicSource.ITUNES);
+        return musicPreferences(tracksByCondition, fallback, new MusicSourceId("itunes"));
     }
 
     private UserMusicPreferences musicPreferences(
             Map<MusicCondition, List<String>> tracksByCondition,
             String fallback,
-            MusicSource preferredSource) {
+            MusicSourceId preferredSource) {
         return new UserMusicPreferences(tracksByCondition, fallback, preferredSource);
     }
 
@@ -156,6 +250,20 @@ class WakeUpApplicationServiceTest {
         };
     }
 
+    private UserPreferencesProvider emptyPreferenceProvider() {
+        return new UserPreferencesProvider() {
+            @Override
+            public void savePreferences(UserId userId, UserWakeUpPreferences userPreferences) {
+                throw new UnsupportedOperationException("Not used by this test");
+            }
+
+            @Override
+            public Optional<UserWakeUpPreferences> findPreferences(UserId userId) {
+                return Optional.empty();
+            }
+        };
+    }
+
     private UserMusicPreferencesProvider musicPreferenceProvider(UserMusicPreferences preferences) {
         return new UserMusicPreferencesProvider() {
             @Override
@@ -166,6 +274,20 @@ class WakeUpApplicationServiceTest {
             @Override
             public Optional<UserMusicPreferences> findByUserId(UserId userId) {
                 return Optional.of(preferences);
+            }
+        };
+    }
+
+    private UserMusicPreferencesProvider emptyMusicPreferenceProvider() {
+        return new UserMusicPreferencesProvider() {
+            @Override
+            public void save(UserId userId, UserMusicPreferences userPreferences) {
+                throw new UnsupportedOperationException("Not used by this test");
+            }
+
+            @Override
+            public Optional<UserMusicPreferences> findByUserId(UserId userId) {
+                return Optional.empty();
             }
         };
     }

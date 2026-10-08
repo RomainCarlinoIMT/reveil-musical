@@ -9,7 +9,7 @@ import java.util.Objects;
 public record UserMusicPreferences(
         Map<MusicCondition, List<String>> tracksByCondition,
         String fallbackTrack,
-        MusicSource preferredSource) {
+        MusicSourceId preferredSource) {
 
     public UserMusicPreferences {
         Objects.requireNonNull(tracksByCondition, "tracksByCondition must not be null");

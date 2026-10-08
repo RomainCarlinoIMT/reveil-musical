@@ -20,13 +20,14 @@ class UserMusicPreferencesTest {
         Map<MusicCondition, List<String>> tracks = new HashMap<>();
         tracks.put(condition, titles);
 
-        UserMusicPreferences preferences = new UserMusicPreferences(tracks, " Default song ", MusicSource.MUSICBRAINZ);
+        UserMusicPreferences preferences = new UserMusicPreferences(
+                tracks, " Default song ", new MusicSourceId("musicbrainz"));
 
         titles.add("Song three");
         tracks.clear();
         assertEquals(List.of("Song one", "Song two"), preferences.tracksByCondition().get(condition));
         assertEquals("Default song", preferences.fallbackTrack());
-        assertEquals(MusicSource.MUSICBRAINZ, preferences.preferredSource());
+        assertEquals(new MusicSourceId("musicbrainz"), preferences.preferredSource());
         assertThrows(UnsupportedOperationException.class,
                 () -> preferences.tracksByCondition().get(condition).add("Song four"));
     }
@@ -36,6 +37,7 @@ class UserMusicPreferencesTest {
         MusicCondition condition = new MusicCondition(DayOfWeek.MONDAY, WeatherType.SOLEIL);
 
         assertThrows(IllegalArgumentException.class,
-                () -> new UserMusicPreferences(Map.of(condition, List.of()), "Default song", MusicSource.ITUNES));
+                () -> new UserMusicPreferences(
+                        Map.of(condition, List.of()), "Default song", new MusicSourceId("itunes")));
     }
 }

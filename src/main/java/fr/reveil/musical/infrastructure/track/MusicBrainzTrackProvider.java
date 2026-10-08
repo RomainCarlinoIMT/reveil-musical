@@ -2,7 +2,7 @@ package fr.reveil.musical.infrastructure.track;
 
 import fr.reveil.musical.application.port.SourceTrackProvider;
 import fr.reveil.musical.application.port.TrackProviderException;
-import fr.reveil.musical.domain.MusicSource;
+import fr.reveil.musical.domain.MusicSourceId;
 import fr.reveil.musical.domain.Track;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -24,6 +24,7 @@ import java.util.StringJoiner;
 public class MusicBrainzTrackProvider implements SourceTrackProvider {
 
     private static final String PROVIDER = "MusicBrainz";
+    private static final MusicSourceId SOURCE_ID = new MusicSourceId("musicbrainz");
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration MINIMUM_REQUEST_INTERVAL = Duration.ofSeconds(1);
 
@@ -50,8 +51,8 @@ public class MusicBrainzTrackProvider implements SourceTrackProvider {
     }
 
     @Override
-    public MusicSource source() {
-        return MusicSource.MUSICBRAINZ;
+    public MusicSourceId sourceId() {
+        return SOURCE_ID;
     }
 
     @Override

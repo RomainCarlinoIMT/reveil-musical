@@ -31,6 +31,9 @@ endpoints sont sous `/api` :
 | `POST` | `/api/users` | Crée un compte et renvoie son UUID et son pseudonyme (`201 Created`). |
 | `POST` | `/api/users/{userId}/music-preferences` | Remplace les préférences musicales de l'utilisateur (`204 No Content`). |
 | `GET` | `/api/users/{userId}/morning-music?day={day}&weather={weather}` | Renvoie la liste correspondant au jour et à la météo (`200 OK`). |
+| `POST` | `/api/users/{userId}/wake-up?day={day}&weather={weather}` | Déclenche le réveil et l'envoi de la notification simulée (`204 No Content`). |
+| `GET` | `/api/users/{userId}/preferences/channel` | Renvoie le canal de notification configuré (`200 OK`). |
+| `PUT` | `/api/users/{userId}/preferences/channel` | Modifie le canal, corps `{"channel":"PUSH"}` (`200 OK`). |
 
 Exemple de création :
 
@@ -48,7 +51,7 @@ Exemple de préférences musicales :
 
 ```json
 {
-  "preferredSource": "MUSICBRAINZ",
+  "preferredSource": "musicbrainz",
   "fallbackTrack": "Morceau de secours",
   "conditions": [
     {
@@ -65,14 +68,38 @@ Exemple de préférences musicales :
 }
 ```
 
-Chaque condition combine les noms enum Java `DayOfWeek` et `WeatherType`. Les
-sources disponibles sont `ITUNES` et `MUSICBRAINZ`. La source préférée est
+Chaque condition combine les noms enum Java `DayOfWeek` et `WeatherType`.
+L'identifiant opaque de source est une chaîne, par exemple `itunes` ou
+`musicbrainz`. La source préférée est
 essayée en premier, puis les autres sources configurées, avant le fallback
 local. Les conditions dupliquées, les morceaux vides et les champs requis
 manquants renvoient `400 Bad Request` ; un `userId` inexistant renvoie
 `404 Not Found`.
-Le stockage en mémoire est perdu au redémarrage. Ce endpoint ne configure pas
-le canal de notification ou l'heure, et l'ordonnanceur n'est pas encore exposé.
+Le stockage en mémoire est perdu au redémarrage. L'endpoint de préférences
+musicales ne configure pas le canal de notification ou l'heure, et
+l'ordonnanceur n'est pas encore exposé.
+
+### Déclenchement et canal de notification
+
+```http
+POST /api/users/a78df734-6964-4774-a079-e67915fa01af/wake-up?day=MONDAY&weather=SOLEIL
+GET  /api/users/a78df734-6964-4774-a079-e67915fa01af/preferences/channel
+PUT  /api/users/a78df734-6964-4774-a079-e67915fa01af/preferences/channel
+Content-Type: application/json
+
+{"channel":"PUSH"}
+```
+
+En l'absence de préférences de réveil, le service applique le canal `EMAIL`
+et l'heure locale `07:00`. En l'absence de préférences musicales, il utilise
+`Aube tranquille` et laisse les fournisseurs distants suivre leur ordre
+d'injection, sans source imposée. Si aucun adaptateur n'est disponible pour le
+canal demandé, le service tente `EMAIL`, puis le premier adaptateur configuré.
+Si l'envoi via un canal autre que `EMAIL` échoue, une tentative de repli est
+faite via l'adaptateur `EMAIL` s'il est distinct et configuré ; les échecs du
+canal par défaut sont journalisés sans autre tentative. Avec un futur sender
+réel, un échec après livraison pourrait rendre le repli duplicatif ; les mocks
+actuels ne livrent aucun message.
 
 Exemple d'appel matinal :
 
@@ -126,6 +153,7 @@ src/main/java/fr/reveil/musical/
 ├── ReveilMusicalApplication.java
 ├── api/
 │   ├── ApiExceptionHandler.java
+│   ├── WakeUpController.java
 │   ├── music/
 │   │   ├── MusicConditionRequest.java
 │   │   ├── MorningMusicController.java
@@ -133,6 +161,7 @@ src/main/java/fr/reveil/musical/
 │   │   └── SaveMusicPreferencesRequest.java
 │   └── user/
 │       ├── CreateUserRequest.java
+│       ├── NotificationChannelController.java
 │       ├── UserController.java
 │       └── UserResponse.java
 ├── application/
@@ -181,7 +210,7 @@ src/main/java/fr/reveil/musical/
 └── domain/
     ├── NotificationChannel.java
     ├── MusicCondition.java
-    ├── MusicSource.java
+    ├── MusicSourceId.java
     ├── Track.java
     ├── UserAccount.java
     ├── UserId.java
@@ -233,6 +262,7 @@ installées dans l'environnement de développement.
 | OpenJDK | 25 (25.0.4 installé) | GPLv2 avec Classpath Exception | Java 25 est la version LTS ciblée. JDK 27 est la version GA la plus récente au moment de la vérification ; le projet reste sur la LTS pour privilégier la stabilité. |
 | Apache Maven | 3.9.11 installé | Apache-2.0 | Apache Maven 3.10.0 est la dernière version stable annoncée ; Maven est un outil de build local, pas une dépendance livrée par l'application. |
 | `spring-boot-maven-plugin` | 4.1.1 | Apache-2.0 | Plugin d'exécution empaqueté avec Spring Boot ; version gérée par le parent Spring Boot. |
+| `jacoco-maven-plugin` | 0.8.15 | EPL-2.0 | Dernière version stable au 8 octobre 2026 (publication du 4 juin 2026) ; prend en charge Java 25. Rapport et seuil de couverture activés à `verify`. |
 | `maven-compiler-plugin`, `maven-resources-plugin`, `maven-surefire-plugin` | 3.15.0, 3.5.0, 3.5.6 | Apache-2.0 | Plugins de compilation, ressources et tests gérés par le parent Spring Boot ; outils de build uniquement. |
 | `spring-boot-starter-webmvc`, `spring-boot-starter-jackson`, `spring-boot-jackson`, `spring-boot-webmvc`, `spring-boot-web-server`, `spring-boot-servlet`, `spring-boot-http-converter` | 4.1.1 | Apache-2.0 | Starter REST MVC et infrastructure JSON/HTTP gérés par le BOM stable Spring Boot. |
 | `spring-web`, `spring-webmvc` | 7.0.9 | Apache-2.0 | Framework REST ; versions gérées par le BOM Spring Boot. |
@@ -253,6 +283,12 @@ installées dans l'environnement de développement.
 | `opentest4j` | 1.3.0 | Apache-2.0 | Version gérée par le BOM stable Spring Boot 4.1.1. |
 | `apiguardian-api` | 1.1.2 | Apache-2.0 | Version gérée par le BOM stable Spring Boot 4.1.1. |
 
+Le rapport JaCoCo est généré avec `mvn verify` dans `target/site/jacoco/`.
+Le seuil initial assumé est de 80 % de couverture des lignes sur le bundle ;
+`mvn verify` échoue si le seuil n'est pas atteint. Il sera relevé au fil de
+l'ajout de scénarios métier. La dernière vérification a mesuré 84,9 % (461
+lignes couvertes sur 543).
+
 Les versions Maven effectives des dépendances de production et de test ont été
 relevées dans l'arbre `mvn dependency:tree`. Les versions transitives sont
 alignées sur le BOM stable Spring Boot 4.1.1 (aucune version n'est surchargée
@@ -270,6 +306,8 @@ Sources de vérification :
 - [Spring Boot](https://spring.io/projects/spring-boot)
 - [Spring Initializr (versions prises en charge)](https://start.spring.io/metadata/client)
 - [Licence Spring Boot](https://github.com/spring-projects/spring-boot/blob/main/LICENSE.txt)
+- [Historique des versions JaCoCo](https://www.jacoco.org/jacoco/trunk/doc/changes.html)
+- [Licence JaCoCo](https://github.com/jacoco/jacoco/blob/master/org.jacoco.doc/license.html)
 - [Maven Central - parent Spring Boot 4.1.1](https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-parent/4.1.1/spring-boot-starter-parent-4.1.1.pom)
 - [Maven Central - Jackson Databind 3.1.5](https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-databind/3.1.5/jackson-databind-3.1.5.pom)
 - [MusicBrainz - politique de limitation](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting)
