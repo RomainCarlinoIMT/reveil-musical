@@ -152,10 +152,96 @@ class ApiControllersTest {
         assertTrue(response.body().contains("preferredSource must be provided"));
     }
 
+    @Test
+    void returnsAllMusicConfiguredForTheRequestedMorningCondition() throws Exception {
+        JsonNode createdUser = objectMapper.readTree(post("/api/users", """
+                {"pseudonym":"Camille"}
+                """).body());
+        String userId = createdUser.path("userId").asString();
+        post("/api/users/" + userId + "/music-preferences", """
+                {
+                  "preferredSource":"ITUNES",
+                  "fallbackTrack":"Fallback song",
+                  "conditions":[
+                    {"day":"MONDAY","weather":"SOLEIL","tracks":["Song one","Song two"]},
+                    {"day":"MONDAY","weather":"PLUIE","tracks":["Rain song"]}
+                  ]
+                }
+                """);
+
+        HttpResponse<String> response = get("/api/users/" + userId
+                + "/morning-music?day=MONDAY&weather=SOLEIL");
+
+        assertEquals(200, response.statusCode());
+        assertEquals(List.of("Song one", "Song two"),
+                objectMapper.readValue(response.body(), objectMapper.getTypeFactory()
+                        .constructCollectionType(List.class, String.class)));
+    }
+
+    @Test
+    void returnsFallbackForMorningWhenNoTracksMatchTheCondition() throws Exception {
+        JsonNode createdUser = objectMapper.readTree(post("/api/users", """
+                {"pseudonym":"Camille"}
+                """).body());
+        String userId = createdUser.path("userId").asString();
+        post("/api/users/" + userId + "/music-preferences", """
+                {"preferredSource":"ITUNES","fallbackTrack":"Fallback song","conditions":[]}
+                """);
+
+        HttpResponse<String> response = get("/api/users/" + userId
+                + "/morning-music?day=MONDAY&weather=SOLEIL");
+
+        assertEquals(200, response.statusCode());
+        assertEquals(List.of("Fallback song"),
+                objectMapper.readValue(response.body(), objectMapper.getTypeFactory()
+                        .constructCollectionType(List.class, String.class)));
+    }
+
+    @Test
+    void rejectsMorningMusicRequestForAnUnknownUser() throws Exception {
+        HttpResponse<String> response = get("/api/users/" + UUID.randomUUID()
+                + "/morning-music?day=MONDAY&weather=SOLEIL");
+
+        assertEquals(404, response.statusCode());
+    }
+
+    @Test
+    void rejectsMorningMusicRequestWhenTheUserHasNoMusicPreferences() throws Exception {
+        JsonNode createdUser = objectMapper.readTree(post("/api/users", """
+                {"pseudonym":"Camille"}
+                """).body());
+        String userId = createdUser.path("userId").asString();
+
+        HttpResponse<String> response = get("/api/users/" + userId
+                + "/morning-music?day=MONDAY&weather=SOLEIL");
+
+        assertEquals(404, response.statusCode());
+    }
+
+    @Test
+    void rejectsInvalidMorningConditionParameters() throws Exception {
+        JsonNode createdUser = objectMapper.readTree(post("/api/users", """
+                {"pseudonym":"Camille"}
+                """).body());
+        String userId = createdUser.path("userId").asString();
+
+        HttpResponse<String> response = get("/api/users/" + userId
+                + "/morning-music?day=INVALID&weather=SOLEIL");
+
+        assertEquals(400, response.statusCode());
+    }
+
     private HttpResponse<String> post(String path, String body) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> get(String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .GET()
                 .build();
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
     }

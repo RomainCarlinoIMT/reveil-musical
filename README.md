@@ -30,6 +30,7 @@ endpoints sont sous `/api` :
 |---|---|---|
 | `POST` | `/api/users` | Crée un compte et renvoie son UUID et son pseudonyme (`201 Created`). |
 | `POST` | `/api/users/{userId}/music-preferences` | Remplace les préférences musicales de l'utilisateur (`204 No Content`). |
+| `GET` | `/api/users/{userId}/morning-music?day={day}&weather={weather}` | Renvoie la liste correspondant au jour et à la météo (`200 OK`). |
 
 Exemple de création :
 
@@ -73,6 +74,21 @@ manquants renvoient `400 Bad Request` ; un `userId` inexistant renvoie
 Le stockage en mémoire est perdu au redémarrage. Ce endpoint ne configure pas
 le canal de notification ou l'heure, et l'ordonnanceur n'est pas encore exposé.
 
+Exemple d'appel matinal :
+
+```http
+GET /api/users/a78df734-6964-4774-a079-e67915fa01af/morning-music?day=MONDAY&weather=SOLEIL
+```
+
+La réponse est un tableau JSON de titres, par exemple
+`["Morceau A", "Morceau B"]`. Le contrôleur délègue à `MorningMusicService`,
+qui récupère les préférences musicales complètes par ID avec
+`UserMusicPreferencesService.findByUserId`, puis sélectionne la liste de la
+condition demandée. Si aucune liste n'est définie pour cette condition, le
+morceau de secours est renvoyé comme tableau à un élément. Un compte sans
+préférences musicales ou un ID inconnu produit `404 Not Found`; des paramètres
+de jour ou météo invalides produisent `400 Bad Request`.
+
 ## Prérequis et commandes
 
 - JDK 25 ou supérieur
@@ -112,6 +128,7 @@ src/main/java/fr/reveil/musical/
 │   ├── ApiExceptionHandler.java
 │   ├── music/
 │   │   ├── MusicConditionRequest.java
+│   │   ├── MorningMusicController.java
 │   │   ├── MusicPreferencesController.java
 │   │   └── SaveMusicPreferencesRequest.java
 │   └── user/
@@ -131,6 +148,7 @@ src/main/java/fr/reveil/musical/
 │   │   └── WakeUpService.java
 │   └── service/
 │       ├── UserAccountService.java
+│       ├── MorningMusicService.java
 │       ├── UserMusicPreferencesService.java
 │       ├── UserPreferencesService.java
 │       └── WakeUpApplicationService.java

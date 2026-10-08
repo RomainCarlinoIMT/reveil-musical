@@ -51,3 +51,10 @@ En relisant les consignes il faudrait ajouter dans les préference de l'utilisat
 Après relecture des consignes j'ai vu que je ne traitais pas le cas de la sources de préférence. J'ai donc donner comme simple consigne à l'IA d'ajouter ce champ. Ici c'est une erreur qui peut servir dans le sens ou ça me permet de tester si le code est extensible ou non, en réference à la consignes oral "imaginons que l'application peut passer à 200 000 utilisateur dans le future"
 
 Note : Les test unitaires me rassure sur la fiablité des modifications
+
+## Prompt 7
+```
+Maintenant le coeur du projet, mettre en place la réponse de l'API aux appels matinaux. Comme dit dans les consignes le but serait de retourner à partir de l'ID utilisateur, le jour et la méteo la liste de musiques correspondant. Point d'attention les consignes demande expressement d'avoir un service interne qui retourne à partir d'un ID utilisateur la liste complète des préference, notre services est déjà capable de mettre ça en place mais faut bien y pensé.
+```
+
+Finallité du TP, la mise en place de la dernière brique manquante, l'API, vu que tout est déjà en place l'ordre donner à l'IA est explicte faire le lien final entre tout les composants. Avec des précisions dans le prompt pour bien sure que la nouvelle route crée répond bien aux exigances du TP.
