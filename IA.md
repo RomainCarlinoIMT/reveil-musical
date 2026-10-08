@@ -22,3 +22,10 @@ Maintenant le but est de mettre en place des implémentation pour l'envois des n
 ```
 
 Ici j'ai choisit de mettre en place les notifications car c'est un module qui a été assez bien découper donc sont implementation ne devrais pas trop changer pour la suite du tp. Mais il reste toujours extensible pour le future.
+
+## Prompt 3
+```
+Maintenant le but va être de en place une implementation de la gestion d'un utlisateur. Le but est de proposer une gestion minimaliste des informations d'un utilisateur. L'utilisateur pourra créer un compte (pseudo) qui aboutira a un userID unique (on pourras utiliser une lib de UUID). Attention ici ne pas faire la gestion des préferences, le but est de seulement préparer la basse pour faire le lien avec ce composant pour le future.
+```
+
+Ici j'ai l'intension de mettre en place un service de gestion des utilisateurs le plus décolérer des préférences utilisateurs. Tout cela dans le but de dire qui si plus tard la gestion de l'utilisateur venait a être plus complexe alors la logique des préférences serait peut impacter et inversement.

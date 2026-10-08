@@ -11,6 +11,9 @@ l'ordonnancement et l'orchestration complète du réveil restent à faire.
 Les notifications email, SMS et push disposent maintenant chacune d'un sender
 mock qui journalise le canal, le destinataire simulé et le message ; aucun
 message n'est envoyé réellement.
+La création de compte accepte un pseudonyme et génère un `UserId` basé sur un
+UUID. Les comptes sont conservés en mémoire uniquement ; aucune préférence
+utilisateur n'est lue ou modifiée par ce composant.
 
 ## Prérequis et commandes
 
@@ -48,12 +51,15 @@ L'ensembre des choix techniques et leur justifications se trouve dans `IA.md`
 src/main/java/fr/reveil/musical/
 ├── ReveilMusicalApplication.java
 ├── application/
-│   └── port/
-│       ├── NotificationAdapter.java
-│       ├── TrackProvider.java
-│       ├── TrackProviderException.java
-│       ├── UserPreferencesProvider.java
-│       └── WakeUpService.java
+│   ├── port/
+│   │   ├── NotificationAdapter.java
+│   │   ├── TrackProvider.java
+│   │   ├── TrackProviderException.java
+│   │   ├── UserAccountRepository.java
+│   │   ├── UserPreferencesProvider.java
+│   │   └── WakeUpService.java
+│   └── service/
+│       └── UserAccountService.java
 ├── infrastructure/
 │   ├── notification/
 │   │   ├── email/
@@ -68,6 +74,8 @@ src/main/java/fr/reveil/musical/
 │   │       ├── MockSmsSender.java
 │   │       ├── SmsNotificationAdapter.java
 │   │       └── SmsSender.java
+│   ├── user/
+│   │   └── InMemoryUserAccountRepository.java
 │   └── track/
 │       ├── FallbackTrackProvider.java
 │       ├── ItunesTrackProvider.java
@@ -79,6 +87,7 @@ src/main/java/fr/reveil/musical/
 └── domain/
     ├── NotificationChannel.java
     ├── Track.java
+    ├── UserAccount.java
     ├── UserId.java
     ├── UserWakeUpPreferences.java
     ├── WakeUpRequest.java
@@ -94,6 +103,11 @@ src/main/java/fr/reveil/musical/
 - `infrastructure.notification` contient un mock et un adaptateur par canal.
   Les méthodes des senders sont volontairement différentes ; chaque adaptateur
   les ramène à l'interface commune `NotificationAdapter`.
+- `UserAccountService` inscrit un compte avec un pseudonyme non vide et un ID
+  UUID. `UserAccountRepository` isole le stockage, fourni ici par une
+  implémentation concurrente en mémoire, perdue au redémarrage.
+- La gestion des comptes reste indépendante des préférences : le port
+  `UserPreferencesProvider` pourra être relié à un stockage ultérieurement.
 - Les adaptateurs sont injectés par constructeur ; le domaine ne dépend ni de
   Spring ni des formats spécifiques des API.
 - `Track` ne transporte pas l'URL spécifique à iTunes : ce détail reste dans
