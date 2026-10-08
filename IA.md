@@ -29,3 +29,10 @@ Maintenant le but va être de en place une implementation de la gestion d'un utl
 ```
 
 Ici j'ai l'intension de mettre en place un service de gestion des utilisateurs le plus décolérer des préférences utilisateurs. Tout cela dans le but de dire qui si plus tard la gestion de l'utilisateur venait a être plus complexe alors la logique des préférences serait peut impacter et inversement.
+
+## Prompt 4
+```
+Maintenant le but va être de mettre en place le stockage des préference, méthode d'envois des notifications, préference de musiques par rapport à la météo, heure d'envois. Et la partie la plus important est de faire une MAP qui va lien un jour de la semaine et un type de méteo à un morceux de musique précis. J'aimerais ajouter une touche personnel aux consignes qui serait de faire en sorte que l'utilisateur puisse enregister plusieurs morceaux par conditions dans le but de créer une diversiter dans les réponse de notre service.
+```
+
+Après avoir la base de tout les autres composants, j'ai finalement mis en place le coeur du projet. J'ai choisit de stocker pour chaque utilisateurs, des préferences qui sont vraiment le coeur du projet tout en laissant place a de futures extensions. J'ai aussi ajouter une touche personnaliser ou l'utilisateurt pourrais enregister plusieurs musiques pour une conditions dans le but d'ajouter du dynanamise à l'application.

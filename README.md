@@ -6,14 +6,21 @@ séparation entre le domaine et les ports d'accès aux fournisseurs.
 
 Les sources musicales iTunes et MusicBrainz sont intégrées derrière
 `TrackProvider`. Un fournisseur composite tente iTunes, puis MusicBrainz, avant
-de choisir un morceau local en secours. Les mocks de notification,
-l'ordonnancement et l'orchestration complète du réveil restent à faire.
+de choisir un morceau local en secours. L'ordonnancement du réveil reste à
+faire.
 Les notifications email, SMS et push disposent maintenant chacune d'un sender
 mock qui journalise le canal, le destinataire simulé et le message ; aucun
 message n'est envoyé réellement.
 La création de compte accepte un pseudonyme et génère un `UserId` basé sur un
 UUID. Les comptes sont conservés en mémoire uniquement ; aucune préférence
 utilisateur n'est lue ou modifiée par ce composant.
+Les préférences de réveil sont également conservées en mémoire et rattachées à
+un compte existant. Elles contiennent un morceau de secours, le canal de
+notification, l'heure locale souhaitée et une liste de morceaux pour chaque
+combinaison jour de semaine / météo. Lors d'un appel de réveil, un morceau est
+choisi aléatoirement dans la liste de la condition reçue, puis envoyé par
+l'adaptateur du canal choisi. L'heure est enregistrée comme préférence, mais
+l'ordonnanceur qui déclencherait le réveil à cette heure reste hors périmètre.
 
 ## Prérequis et commandes
 
@@ -59,7 +66,9 @@ src/main/java/fr/reveil/musical/
 │   │   ├── UserPreferencesProvider.java
 │   │   └── WakeUpService.java
 │   └── service/
-│       └── UserAccountService.java
+│       ├── UserAccountService.java
+│       ├── UserPreferencesService.java
+│       └── WakeUpApplicationService.java
 ├── infrastructure/
 │   ├── notification/
 │   │   ├── email/
@@ -75,7 +84,8 @@ src/main/java/fr/reveil/musical/
 │   │       ├── SmsNotificationAdapter.java
 │   │       └── SmsSender.java
 │   ├── user/
-│   │   └── InMemoryUserAccountRepository.java
+│   │   ├── InMemoryUserAccountRepository.java
+│   │   └── InMemoryUserPreferencesProvider.java
 │   └── track/
 │       ├── FallbackTrackProvider.java
 │       ├── ItunesTrackProvider.java
@@ -86,6 +96,7 @@ src/main/java/fr/reveil/musical/
 │       └── TrackSearchRateLimiter.java
 └── domain/
     ├── NotificationChannel.java
+    ├── MusicCondition.java
     ├── Track.java
     ├── UserAccount.java
     ├── UserId.java
@@ -106,8 +117,16 @@ src/main/java/fr/reveil/musical/
 - `UserAccountService` inscrit un compte avec un pseudonyme non vide et un ID
   UUID. `UserAccountRepository` isole le stockage, fourni ici par une
   implémentation concurrente en mémoire, perdue au redémarrage.
-- La gestion des comptes reste indépendante des préférences : le port
-  `UserPreferencesProvider` pourra être relié à un stockage ultérieurement.
+- `UserPreferencesService` stocke séparément les préférences liées à un compte
+  existant. `MusicCondition` constitue la clé `(jour, météo)` de la map de
+  listes de morceaux, et `LocalTime` représente l'heure souhaitée sans gérer
+  encore le fuseau horaire ni le déclenchement.
+- `WakeUpApplicationService` relie les préférences, le fournisseur de morceaux
+  et l'adaptateur de notification lors d'un appel déclencheur. La liste de
+  morceaux de la condition est choisie aléatoirement ; une condition absente
+  utilise le morceau de secours.
+- Les comptes et préférences restent indépendants en stockage : les
+  préférences ne sont pas incorporées au modèle `UserAccount`.
 - Les adaptateurs sont injectés par constructeur ; le domaine ne dépend ni de
   Spring ni des formats spécifiques des API.
 - `Track` ne transporte pas l'URL spécifique à iTunes : ce détail reste dans
