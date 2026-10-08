@@ -5,7 +5,6 @@ import fr.reveil.musical.domain.UserAccount;
 import fr.reveil.musical.domain.UserId;
 import org.springframework.stereotype.Service;
 
-import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -18,7 +17,9 @@ public class UserAccountService {
     }
 
     public UserAccount register(String pseudonym) {
-        Objects.requireNonNull(pseudonym, "pseudonym must not be null");
+        if (pseudonym == null) {
+            throw new IllegalArgumentException("pseudonym must not be null");
+        }
         String normalizedPseudonym = pseudonym.strip();
         if (normalizedPseudonym.isBlank()) {
             throw new IllegalArgumentException("pseudonym must not be blank");

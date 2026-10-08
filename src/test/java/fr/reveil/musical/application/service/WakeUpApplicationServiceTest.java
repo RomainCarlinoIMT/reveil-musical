@@ -2,11 +2,13 @@ package fr.reveil.musical.application.service;
 
 import fr.reveil.musical.application.port.NotificationAdapter;
 import fr.reveil.musical.application.port.TrackProvider;
+import fr.reveil.musical.application.port.UserMusicPreferencesProvider;
 import fr.reveil.musical.application.port.UserPreferencesProvider;
 import fr.reveil.musical.domain.MusicCondition;
 import fr.reveil.musical.domain.NotificationChannel;
 import fr.reveil.musical.domain.Track;
 import fr.reveil.musical.domain.UserId;
+import fr.reveil.musical.domain.UserMusicPreferences;
 import fr.reveil.musical.domain.UserWakeUpPreferences;
 import fr.reveil.musical.domain.WakeUpRequest;
 import fr.reveil.musical.domain.WeatherType;
@@ -30,10 +32,10 @@ class WakeUpApplicationServiceTest {
     @Test
     void selectsFromTheRequestedDayAndWeatherAndUsesThePreferredChannel() {
         List<String> titles = List.of("Song one", "Song two");
-        UserWakeUpPreferences preferences = preferences(
+        UserMusicPreferences musicPreferences = musicPreferences(
                 Map.of(new MusicCondition(DayOfWeek.MONDAY, WeatherType.SOLEIL), titles),
-                "Fallback song",
-                NotificationChannel.SMS);
+                "Fallback song");
+        UserWakeUpPreferences wakeUpPreferences = wakeUpPreferences(NotificationChannel.SMS);
         AtomicReference<String> searchedTitle = new AtomicReference<>();
         AtomicReference<Track> sentTrack = new AtomicReference<>();
         AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
@@ -47,7 +49,8 @@ class WakeUpApplicationServiceTest {
         NotificationAdapter pushAdapter = notificationAdapter(NotificationChannel.PUSH, sentChannel, sentTrack);
 
         WakeUpApplicationService service = new WakeUpApplicationService(
-                preferenceProvider(preferences),
+                preferenceProvider(wakeUpPreferences),
+                musicPreferenceProvider(musicPreferences),
                 trackProvider,
                 List.of(emailAdapter, smsAdapter, pushAdapter));
 
@@ -60,7 +63,8 @@ class WakeUpApplicationServiceTest {
 
     @Test
     void usesTheFallbackWhenNoTrackListExistsForTheCondition() {
-        UserWakeUpPreferences preferences = preferences(Map.of(), "Fallback song", NotificationChannel.PUSH);
+        UserMusicPreferences musicPreferences = musicPreferences(Map.of(), "Fallback song");
+        UserWakeUpPreferences wakeUpPreferences = wakeUpPreferences(NotificationChannel.PUSH);
         AtomicReference<String> searchedTitle = new AtomicReference<>();
         AtomicReference<Track> sentTrack = new AtomicReference<>();
         AtomicReference<NotificationChannel> sentChannel = new AtomicReference<>();
@@ -72,7 +76,10 @@ class WakeUpApplicationServiceTest {
                 NotificationChannel.PUSH, sentChannel, sentTrack);
 
         WakeUpApplicationService service = new WakeUpApplicationService(
-                preferenceProvider(preferences), trackProvider, List.of(pushAdapter));
+                preferenceProvider(wakeUpPreferences),
+                musicPreferenceProvider(musicPreferences),
+                trackProvider,
+                List.of(pushAdapter));
 
         service.wakeUp(REQUEST);
 
@@ -83,10 +90,10 @@ class WakeUpApplicationServiceTest {
 
     @Test
     void retriesWithFallbackWhenTheSelectedTrackCannotBeResolved() {
-        UserWakeUpPreferences preferences = preferences(
+        UserMusicPreferences musicPreferences = musicPreferences(
                 Map.of(new MusicCondition(DayOfWeek.MONDAY, WeatherType.SOLEIL), List.of("Unknown song")),
-                "Fallback song",
-                NotificationChannel.EMAIL);
+                "Fallback song");
+        UserWakeUpPreferences wakeUpPreferences = wakeUpPreferences(NotificationChannel.EMAIL);
         AtomicReference<String> sentTitle = new AtomicReference<>();
         NotificationAdapter emailAdapter = new NotificationAdapter() {
             @Override
@@ -103,19 +110,24 @@ class WakeUpApplicationServiceTest {
                 ? Optional.of(new Track(title, "Artist"))
                 : Optional.empty();
         WakeUpApplicationService service = new WakeUpApplicationService(
-                preferenceProvider(preferences), trackProvider, List.of(emailAdapter));
+                preferenceProvider(wakeUpPreferences),
+                musicPreferenceProvider(musicPreferences),
+                trackProvider,
+                List.of(emailAdapter));
 
         service.wakeUp(REQUEST);
 
         assertEquals("Fallback song", sentTitle.get());
     }
 
-    private UserWakeUpPreferences preferences(
+    private UserWakeUpPreferences wakeUpPreferences(NotificationChannel channel) {
+        return new UserWakeUpPreferences(channel, LocalTime.of(7, 30));
+    }
+
+    private UserMusicPreferences musicPreferences(
             Map<MusicCondition, List<String>> tracksByCondition,
-            String fallback,
-            NotificationChannel channel) {
-        return new UserWakeUpPreferences(
-                tracksByCondition, fallback, channel, LocalTime.of(7, 30));
+            String fallback) {
+        return new UserMusicPreferences(tracksByCondition, fallback);
     }
 
     private UserPreferencesProvider preferenceProvider(UserWakeUpPreferences preferences) {
@@ -127,6 +139,20 @@ class WakeUpApplicationServiceTest {
 
             @Override
             public Optional<UserWakeUpPreferences> findPreferences(UserId userId) {
+                return Optional.of(preferences);
+            }
+        };
+    }
+
+    private UserMusicPreferencesProvider musicPreferenceProvider(UserMusicPreferences preferences) {
+        return new UserMusicPreferencesProvider() {
+            @Override
+            public void save(UserId userId, UserMusicPreferences userPreferences) {
+                throw new UnsupportedOperationException("Not used by this test");
+            }
+
+            @Override
+            public Optional<UserMusicPreferences> findByUserId(UserId userId) {
                 return Optional.of(preferences);
             }
         };

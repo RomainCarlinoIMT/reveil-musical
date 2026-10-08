@@ -7,20 +7,65 @@ séparation entre le domaine et les ports d'accès aux fournisseurs.
 Les sources musicales iTunes et MusicBrainz sont intégrées derrière
 `TrackProvider`. Un fournisseur composite tente iTunes, puis MusicBrainz, avant
 de choisir un morceau local en secours. L'ordonnancement du réveil reste à
-faire.
-Les notifications email, SMS et push disposent maintenant chacune d'un sender
+faire. Les notifications email, SMS et push disposent chacune d'un sender
 mock qui journalise le canal, le destinataire simulé et le message ; aucun
 message n'est envoyé réellement.
 La création de compte accepte un pseudonyme et génère un `UserId` basé sur un
-UUID. Les comptes sont conservés en mémoire uniquement ; aucune préférence
-utilisateur n'est lue ou modifiée par ce composant.
-Les préférences de réveil sont également conservées en mémoire et rattachées à
-un compte existant. Elles contiennent un morceau de secours, le canal de
-notification, l'heure locale souhaitée et une liste de morceaux pour chaque
-combinaison jour de semaine / météo. Lors d'un appel de réveil, un morceau est
-choisi aléatoirement dans la liste de la condition reçue, puis envoyé par
-l'adaptateur du canal choisi. L'heure est enregistrée comme préférence, mais
-l'ordonnanceur qui déclencherait le réveil à cette heure reste hors périmètre.
+UUID. Les comptes sont conservés en mémoire uniquement ; les préférences
+musicales sont stockées séparément avec un morceau de secours et une liste de
+morceaux par combinaison jour de semaine / météo. Les réglages de réveil
+(canal de notification et heure locale) sont également séparés. Lors d'un
+appel de réveil, un morceau est choisi aléatoirement dans la liste de la
+condition reçue, puis envoyé par l'adaptateur du canal choisi. L'heure est
+enregistrée comme préférence, mais l'ordonnanceur reste hors périmètre.
+
+## API REST
+
+Les comptes et les préférences musicales ont chacun leur contrôleur. Tous les
+endpoints sont sous `/api` :
+
+| Méthode | Endpoint | Résultat |
+|---|---|---|
+| `POST` | `/api/users` | Crée un compte et renvoie son UUID et son pseudonyme (`201 Created`). |
+| `POST` | `/api/users/{userId}/music-preferences` | Remplace les préférences musicales de l'utilisateur (`204 No Content`). |
+
+Exemple de création :
+
+```json
+{"pseudonym":"Camille"}
+```
+
+Réponse :
+
+```json
+{"userId":"a78df734-6964-4774-a079-e67915fa01af","pseudonym":"Camille"}
+```
+
+Exemple de préférences musicales :
+
+```json
+{
+  "fallbackTrack": "Morceau de secours",
+  "conditions": [
+    {
+      "day": "MONDAY",
+      "weather": "SOLEIL",
+      "tracks": ["Morceau A", "Morceau B"]
+    },
+    {
+      "day": "MONDAY",
+      "weather": "PLUIE",
+      "tracks": ["Morceau C"]
+    }
+  ]
+}
+```
+
+Chaque condition combine les noms enum Java `DayOfWeek` et `WeatherType`. Les
+conditions dupliquées, les morceaux vides et les champs requis manquants
+renvoient `400 Bad Request` ; un `userId` inexistant renvoie `404 Not Found`.
+Le stockage en mémoire est perdu au redémarrage. Ce endpoint ne configure pas
+le canal de notification ou l'heure, et l'ordonnanceur n'est pas encore exposé.
 
 ## Prérequis et commandes
 
@@ -57,16 +102,28 @@ L'ensembre des choix techniques et leur justifications se trouve dans `IA.md`
 ```text
 src/main/java/fr/reveil/musical/
 ├── ReveilMusicalApplication.java
+├── api/
+│   ├── ApiExceptionHandler.java
+│   ├── music/
+│   │   ├── MusicConditionRequest.java
+│   │   ├── MusicPreferencesController.java
+│   │   └── SaveMusicPreferencesRequest.java
+│   └── user/
+│       ├── CreateUserRequest.java
+│       ├── UserController.java
+│       └── UserResponse.java
 ├── application/
 │   ├── port/
 │   │   ├── NotificationAdapter.java
 │   │   ├── TrackProvider.java
 │   │   ├── TrackProviderException.java
 │   │   ├── UserAccountRepository.java
+│   │   ├── UserMusicPreferencesProvider.java
 │   │   ├── UserPreferencesProvider.java
 │   │   └── WakeUpService.java
 │   └── service/
 │       ├── UserAccountService.java
+│       ├── UserMusicPreferencesService.java
 │       ├── UserPreferencesService.java
 │       └── WakeUpApplicationService.java
 ├── infrastructure/
@@ -85,6 +142,7 @@ src/main/java/fr/reveil/musical/
 │   │       └── SmsSender.java
 │   ├── user/
 │   │   ├── InMemoryUserAccountRepository.java
+│   │   ├── InMemoryUserMusicPreferencesProvider.java
 │   │   └── InMemoryUserPreferencesProvider.java
 │   └── track/
 │       ├── FallbackTrackProvider.java
@@ -100,6 +158,7 @@ src/main/java/fr/reveil/musical/
     ├── Track.java
     ├── UserAccount.java
     ├── UserId.java
+    ├── UserMusicPreferences.java
     ├── UserWakeUpPreferences.java
     ├── WakeUpRequest.java
     └── WeatherType.java
@@ -117,14 +176,16 @@ src/main/java/fr/reveil/musical/
 - `UserAccountService` inscrit un compte avec un pseudonyme non vide et un ID
   UUID. `UserAccountRepository` isole le stockage, fourni ici par une
   implémentation concurrente en mémoire, perdue au redémarrage.
-- `UserPreferencesService` stocke séparément les préférences liées à un compte
-  existant. `MusicCondition` constitue la clé `(jour, météo)` de la map de
-  listes de morceaux, et `LocalTime` représente l'heure souhaitée sans gérer
-  encore le fuseau horaire ni le déclenchement.
-- `WakeUpApplicationService` relie les préférences, le fournisseur de morceaux
-  et l'adaptateur de notification lors d'un appel déclencheur. La liste de
-  morceaux de la condition est choisie aléatoirement ; une condition absente
-  utilise le morceau de secours.
+- `api.user.UserController` crée les comptes ; `api.music.MusicPreferencesController`
+  enregistre séparément les préférences musicales d'un compte existant.
+  `UserMusicPreferencesService` et `UserMusicPreferencesProvider` gardent le
+  stockage de ces préférences indépendant des réglages de notification et de
+  l'heure de réveil.
+- `UserPreferencesService` stocke séparément le canal et l'heure souhaitée ;
+  `LocalTime` ne définit pas encore de fuseau horaire ni de déclenchement.
+- `WakeUpApplicationService` lit séparément les préférences musicales et les
+  réglages de réveil, puis relie le fournisseur de morceaux et l'adaptateur de
+  notification. Une condition absente utilise le morceau de secours.
 - Les comptes et préférences restent indépendants en stockage : les
   préférences ne sont pas incorporées au modèle `UserAccount`.
 - Les adaptateurs sont injectés par constructeur ; le domaine ne dépend ni de
@@ -146,6 +207,9 @@ installées dans l'environnement de développement.
 | Apache Maven | 3.9.11 installé | Apache-2.0 | Apache Maven 3.10.0 est la dernière version stable annoncée ; Maven est un outil de build local, pas une dépendance livrée par l'application. |
 | `spring-boot-maven-plugin` | 4.1.1 | Apache-2.0 | Plugin d'exécution empaqueté avec Spring Boot ; version gérée par le parent Spring Boot. |
 | `maven-compiler-plugin`, `maven-resources-plugin`, `maven-surefire-plugin` | 3.15.0, 3.5.0, 3.5.6 | Apache-2.0 | Plugins de compilation, ressources et tests gérés par le parent Spring Boot ; outils de build uniquement. |
+| `spring-boot-starter-webmvc`, `spring-boot-starter-jackson`, `spring-boot-jackson`, `spring-boot-webmvc`, `spring-boot-web-server`, `spring-boot-servlet`, `spring-boot-http-converter` | 4.1.1 | Apache-2.0 | Starter REST MVC et infrastructure JSON/HTTP gérés par le BOM stable Spring Boot. |
+| `spring-web`, `spring-webmvc` | 7.0.9 | Apache-2.0 | Framework REST ; versions gérées par le BOM Spring Boot. |
+| `spring-boot-starter-tomcat`, `spring-boot-starter-tomcat-runtime`, `spring-boot-tomcat`, `tomcat-embed-core`, `tomcat-embed-el`, `tomcat-embed-websocket` | 4.1.1, 11.0.24 | Apache-2.0 | Serveur HTTP embarqué pour l'API ; versions gérées par le BOM Spring Boot. |
 | `jackson-databind`, `jackson-core` (Jackson 3) | 3.1.5 | Apache-2.0 | Utilisés pour lire les réponses JSON ; version gérée par le BOM de Spring Boot 4.1.1. Jackson 3.2.3 est plus récent ; on conserve la version du BOM pour éviter une surcharge qui pourrait introduire une incompatibilité. |
 | `jackson-annotations` (Jackson 2) | 2.21 | Apache-2.0 | Dépendance transitive du module Jackson 3, version gérée par le BOM Spring Boot ; 2.21.5 est plus récente mais reste non surchargée pour préserver l'alignement du BOM. |
 | `spring-boot-starter`, `spring-boot-starter-logging`, `spring-boot-autoconfigure`, `spring-boot`, `spring-boot-test` | 4.1.1 | Apache-2.0 | Version stable proposée par Spring Initializr. Gérée par le parent/BOM Spring Boot ; aucune surcharge de version. |
@@ -169,6 +233,8 @@ individuellement). Le socle de test est volontairement limité à Spring Test et
 JUnit ; il n'ajoute pas de bibliothèques de mock ou d'assertions tierces.
 Les mocks de notification utilisent SLF4J fourni transitivement par Spring
 Boot ; aucune nouvelle dépendance n'a été ajoutée pour eux.
+Le serveur REST s'appuie sur Spring MVC et Tomcat embarqué, tous deux sous
+licence Apache-2.0, sans composant propriétaire.
 Vérifier à nouveau licence et fraîcheur avant toute mise à jour du BOM ou
 ajout de dépendance.
 

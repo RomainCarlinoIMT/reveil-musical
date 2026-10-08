@@ -36,3 +36,9 @@ Maintenant le but va être de mettre en place le stockage des préference, méth
 ```
 
 Après avoir la base de tout les autres composants, j'ai finalement mis en place le coeur du projet. J'ai choisit de stocker pour chaque utilisateurs, des préferences qui sont vraiment le coeur du projet tout en laissant place a de futures extensions. J'ai aussi ajouter une touche personnaliser ou l'utilisateurt pourrais enregister plusieurs musiques pour une conditions dans le but d'ajouter du dynanamise à l'application.
+## Prompt 5
+```
+Le prochain objectif est de mettre en place, la base de l'API, l'idéal serait une API du type REST. Le but est de faire pour le moment seulement la gestion de la création d'un utlisateur et d'ajout des préférence de musique. Il faudrait idéalment créer un controlleur specifique pour chaque besoin (un pour l'utilisateur et un pour les pref).
+```
+
+Ici j'ai demander de mettre en place la partie API de notre servir et indrectement de faire le lien entre toutes les parties précendentes. Il faut noter que l'IA à fait la remarque interresante de separer des préferences utilisateurs la partie purement utilisateur (methode d'envois, heure d'envois) et la partie musique. Cela a permis de repondre à mon besoin de basse de faire deux controlleurs pour éviter d'avoir du single point of failure et donc de repondre à l'exigence de l'énnoncer d'avoir un mode dégradder possible.

@@ -40,7 +40,7 @@ class UserAccountServiceTest {
 
     @Test
     void rejectsNullAndBlankPseudonyms() {
-        assertThrows(NullPointerException.class, () -> service.register(null));
+        assertThrows(IllegalArgumentException.class, () -> service.register(null));
         assertThrows(IllegalArgumentException.class, () -> service.register("  "));
     }
 
