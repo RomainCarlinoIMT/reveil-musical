@@ -150,3 +150,10 @@ Sources de vérification :
 - [OpenJDK - GPLv2 avec Classpath Exception](https://openjdk.org/legal/gplv2+ce.html)
 - [Versions Apache Maven](https://maven.apache.org/download.cgi)
 - [Versions OpenJDK disponibles](https://jdk.java.net/)
+
+
+## Trouble shooting
+
+# Case 1
+If test are ends with errors like `can't find adapter for xxx`, you might need to use `mvn clean` and then do the tests again `mvn test`.
+Occurred when I made major changes in interfaces.
