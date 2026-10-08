@@ -35,6 +35,10 @@ iTunes et un par seconde pour MusicBrainz. En cas d'échec technique ou
 d'absence de résultat, le fournisseur composite journalise le mode dégradé et
 choisit un morceau local.
 
+## Choix technique
+
+L'ensembre des choix techniques et leur justifications se trouve dans `IA.md`
+
 ## Structure initiale
 
 ```text
